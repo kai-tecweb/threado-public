@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Threads運用センター 初期設定完全マニュアル</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="manual-page">
+      <section class="panel hero">
+        <div>
+          <p class="eyebrow">完全マニュアル</p>
+          <h1>Threads運用センター 初期設定完全マニュアル</h1>
+          <p class="muted">
+            このページは、Meta 側の準備から、このアプリでの入力、OAuth 認証、最初の動作確認までを、初心者向けに順番で説明する手順書です。
+          </p>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">根拠</p>
+            <h3>この手順のベースにした公式情報</h3>
+          </div>
+        </div>
+        <div class="callout info">
+          <h4>公式ベースで整理しています</h4>
+          <p>
+            トークン期限、長期トークン更新条件、Threads App secret の場所、HTTPS Redirect URL の必要性は Meta 公式ドキュメントと Meta 公式サンプルを基準にしています。
+          </p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>資料</th>
+                <th>確認した内容</th>
+                <th>リンク</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Meta公式 Long-Lived Tokens</td>
+                <td>短期は1時間、長期は60日、更新は24時間経過後かつ未失効の長期トークンのみ</td>
+                <td><a href="https://developers.facebook.com/docs/threads/get-started/long-lived-tokens" target="_blank" rel="noreferrer">開く</a></td>
+              </tr>
+              <tr>
+                <td>Meta公式 Sample App</td>
+                <td>Threads App ID / Secret を使うこと、Redirect Callback URL を App Dashboard に登録すること、localhost ではなく HTTPS のローカルドメインを使うこと</td>
+                <td><a href="https://github.com/fbsamples/threads_api" target="_blank" rel="noreferrer">開く</a></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">前提</p>
+            <h3>最初に理解しておく3つ</h3>
+          </div>
+        </div>
+        <div class="step-list">
+          <article class="step-card">
+            <span class="step-number">1</span>
+            <div>
+              <h4>このアプリは「ローカル運用画面」です</h4>
+              <p>普段の操作はローカルでできますが、Threads OAuth の Redirect URI と Webhook は HTTPS が必要です。</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">2</span>
+            <div>
+              <h4>OAuth は HTTPS の URL が必要です</h4>
+              <p>Meta 公式サンプルでも `localhost` を使わず、ローカル用ドメインを用意して HTTPS 化しています。`http://127.0.0.1` のままでは OAuth は通りません。</p>
+            </div>
+          </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <div>
+                <h4>このアプリは `/callback` で自動受け取りします</h4>
+                <p>認証後に Redirect URL へ戻ると、このアプリが `code` を自動で取り込みます。`認証コードを交換` は、うまく戻らなかったときの予備導線です。</p>
+              </div>
+            </article>
+          <article class="step-card">
+            <span class="step-number">4</span>
+            <div>
+              <h4>GAS を使う場合は「公開窓口」だけ GAS に切り分けます</h4>
+              <p>普段の画面操作はローカルアプリのままです。Meta からの callback だけ GAS Webアプリで受け、ローカルの Threads運用センター があとから `GAS同期` で取り込みます。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Phase 1</p>
+            <h3>Meta 側で先にやること</h3>
+          </div>
+        </div>
+        <div class="step-list">
+          <article class="step-card">
+            <span class="step-number">1</span>
+            <div>
+              <h4>Meta for Developers にログインする</h4>
+              <p>ブラウザで Meta for Developers を開き、Threads API 用のアプリ設定画面を開きます。Meta 側の画面表記は更新で少し変わることがありますが、`Threads API` に関する設定ページを開くのが目的です。</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">2</span>
+            <div>
+              <h4>Threads App ID と Threads App secret を確認する</h4>
+              <p>Meta 公式ドキュメントでは、長期トークン交換時に `Threads app secret` を使うと明記されています。通常のアプリID/Secretと混同せず、Threads 用の値を控えてください。</p>
+            </div>
+          </article>
+            <article class="step-card">
+              <span class="step-number">3</span>
+              <div>
+                <h4>Meta のカスタマイズ画面で 3 本の URL を登録する</h4>
+                <p>完成版運用では `Redirect Callback URL`、`Deauthorize Callback URL`、`Data Deletion Request URL` を設定します。ローカル直結なら `https://your-domain.example/callback` 形式、GASブリッジなら `https://script.google.com/macros/s/xxxxx/exec?action=oauth_callback`、`...?action=meta_deauthorize`、`...?action=meta_data_deletion` 形式で入れます。`localhost` と `127.0.0.1` は使いません。</p>
+              </div>
+            </article>
+          <article class="step-card">
+            <span class="step-number">4</span>
+            <div>
+              <h4>最初に使う権限を決める</h4>
+              <p>このアプリでは、まず `threads_basic`、`threads_content_publish`、`threads_manage_insights`、`threads_manage_replies`、`threads_read_replies` を入れる前提です。長期トークン更新には `threads_basic` が重要です。</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">5</span>
+            <div>
+              <h4>Webhook を使うなら公開 HTTPS URL を用意する</h4>
+              <p>自動返信で Webhook を使う場合は、Meta から到達できる公開 HTTPS URL が必要です。あとで `WebhookベースURL`、`Verify Token`、`Webhook Secret` に入れます。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Phase 2</p>
+            <h3>このアプリで最初に入力するもの</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>画面</th>
+                <th>項目</th>
+                <th>何を入れるか</th>
+                <th>初心者のおすすめ</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td>設定</td><td>ホスト</td><td>アプリを開くアドレス</td><td>`127.0.0.1` のまま</td></tr>
+              <tr><td>設定</td><td>ポート</td><td>アプリのポート番号</td><td>`8765` のまま</td></tr>
+              <tr><td>設定</td><td>セーフモード</td><td>実投稿せずにテストするか</td><td>最初は ON</td></tr>
+              <tr><td>設定</td><td>バックグラウンドスケジューラ</td><td>予約投稿や自動更新を巡回するか</td><td>ON</td></tr>
+              <tr><td>設定</td><td>GAS WebアプリURL</td><td>GAS を使うときの WebアプリURL</td><td>使う場合だけ入力</td></tr>
+              <tr><td>設定</td><td>GAS共有キー</td><td>GAS とローカルで共通にするキー</td><td>使う場合だけ入力</td></tr>
+              <tr><td>アカウント</td><td>表示名</td><td>アプリ内で識別する名前</td><td>`本垢` など分かる名前</td></tr>
+              <tr><td>アカウント</td><td>ユーザー名</td><td>Threads のユーザー名</td><td>@なしで入力</td></tr>
+              <tr><td>アカウント</td><td>発信ジャンル</td><td>何を発信するアカウントか</td><td>`AIツール` など</td></tr>
+              <tr><td>アカウント</td><td>運用モード</td><td>手動中心か自動中心か</td><td>最初は `手動`</td></tr>
+              <tr><td>アカウント</td><td>Threads App ID</td><td>Meta 側で控えた Threads App ID</td><td>必須</td></tr>
+              <tr><td>アカウント</td><td>Threads App Secret</td><td>Meta 側で控えた Threads App secret</td><td>必須</td></tr>
+                <tr><td>アカウント</td><td>Redirect URI</td><td>Meta 側で登録した Redirect Callback URL と同じ値</td><td>必ず HTTPS</td></tr>
+                <tr><td>Meta App Dashboard</td><td>Deauthorize Callback URL</td><td>`https://公開URL/api/meta/deauthorize`</td><td>完成版では設定</td></tr>
+                <tr><td>Meta App Dashboard</td><td>Data Deletion Request URL</td><td>`https://公開URL/api/meta/data-deletion`</td><td>完成版では設定</td></tr>
+                <tr><td>アカウント</td><td>Scopes</td><td>使う権限の一覧</td><td>初期値のまま開始</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Phase 3</p>
+            <h3>このアプリで実際に押す順番</h3>
+          </div>
+        </div>
+        <div class="step-list">
+          <article class="step-card">
+            <span class="step-number">1</span>
+            <div>
+              <h4>`設定` を開いて保存する</h4>
+              <p>左メニューの `設定` を押します。最初は初期値のままでも大丈夫なので、`設定を保存` を押して保存してください。</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">2</span>
+            <div>
+              <h4>`CLIを検出` を押す</h4>
+              <p>Claude Code または Codex のうち使いたいものが `利用可` か確認します。`未検出` のときは、先にそのCLIをPC側でインストール・ログインしてからやり直します。テーブルの「動作確認」ボタンで PONG 応答を確認できれば本番運用可能です。</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">2.5</span>
+            <div>
+              <h4>GAS を使うなら `設定` に GAS 情報を入れる</h4>
+              <p>`GAS WebアプリURL`、`GAS共有キー`、`GASブリッジを有効にする` を設定してから、もう一度 `設定を保存` を押します。Meta に入れる URL は GAS ブリッジ側で生成された exec URL（`https://script.google.com/macros/s/xxxxx/exec` 形式）に揃えます。</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">3</span>
+            <div>
+              <h4>`アカウント` を開いて基本情報を入れる</h4>
+              <p>`表示名`、`ユーザー名`、`発信ジャンル`、`運用モード` を入れてから、一度 `アカウントを保存` を押します。</p>
+            </div>
+          </article>
+          <article class="step-card">
+            <span class="step-number">4</span>
+            <div>
+              <h4>同じ画面で Threads 連携情報を入れる</h4>
+                <p>`Threads App ID`、`Threads App Secret`、`Redirect URI`、`Scopes` を入れます。Webhookを使う予定なら `Verify Token` と `Webhook Secret` も入れます。`Deauthorize` と `Data Deletion` の 2 本は、アプリ保存後に `連携URLガイド` に表示された URL を Meta 側に登録します。入力したら再度 `アカウントを保存` を押します。</p>
+              </div>
+            </article>
+          <article class="step-card">
+            <span class="step-number">5</span>
+            <div>
+              <h4>`OAuth URLを開く` を押す</h4>
+              <p>ブラウザで Meta の認証画面が開きます。許可まで進めてください。</p>
+            </div>
+          </article>
+            <article class="step-card">
+              <span class="step-number">6</span>
+              <div>
+                <h4>完了画面が開くか確認する</h4>
+                <p>認証後に `/callback` の完了画面が開けば、自動で短期トークン取得、長期トークン交換、プロフィール取得まで進みます。</p>
+              </div>
+            </article>
+            <article class="step-card">
+              <span class="step-number">7</span>
+              <div>
+                <h4>うまく戻らないときだけ `認証コードを交換` を使う</h4>
+                <p>ブラウザの URL に `?code=...` が残っている場合だけ、その `code` をコピーして `認証コードを交換` に貼り付けます。</p>
+              </div>
+            </article>
+          <article class="step-card">
+            <span class="step-number">8</span>
+            <div>
+              <h4>`メトリクス取得` を押して接続確認する</h4>
+              <p>エラーが出ず、アカウント一覧の認証状態が `正常` に近い表示になれば初期接続は成功です。</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">Phase 4</p>
+            <h3>接続後に最初に試すこと</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>やること</th>
+                <th>操作</th>
+                <th>成功の目印</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>リサーチを登録する</td>
+                <td>`リサーチ` 画面で条件を入れて `リサーチを保存`</td>
+                <td>右側の一覧に出る</td>
+              </tr>
+              <tr>
+                <td>ナレッジを作る</td>
+                <td>リサーチ結果を入れて `型を分析してナレッジ化`</td>
+                <td>`ナレッジ` 画面にカードが増える</td>
+              </tr>
+              <tr>
+                <td>投稿ジョブを作る</td>
+                <td>`投稿` 画面で `ジョブを保存` -> `本文を生成`</td>
+                <td>生成結果欄に本文が入る</td>
+              </tr>
+              <tr>
+                <td>テスト投稿する</td>
+                <td>セーフモードONのまま `今すぐ実行`</td>
+                <td>実ジョブがシミュレーション扱いで完走する</td>
+              </tr>
+              <tr>
+                <td>自動返信ルールを作る</td>
+                <td>`返信` 画面でキーワードとテンプレートを入れて保存</td>
+                <td>返信ルール一覧に出る</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">このアプリ固有</p>
+            <h3>初心者向けの現実的な運用方法</h3>
+          </div>
+        </div>
+        <div class="callout warning">
+          <h4>今は「公開HTTPS URLを1つ用意する」方法が一番分かりやすいです</h4>
+          <p>このアプリは普段はローカルで動きますが、OAuth、Webhook、Deauthorize、Data Deletion は HTTPS が必要です。初心者なら、まずは HTTPS の公開URLを1つ用意し、その URL を `Redirect URI` と `WebhookベースURL` に使う構成が分かりやすいです。</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>値</th>
+                <th>例</th>
+                <th>どこに入れるか</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>公開HTTPS URL</td>
+                <td>`https://abc123.example.com`</td>
+                <td>`設定 > WebhookベースURL`</td>
+              </tr>
+              <tr>
+                <td>Redirect URI</td>
+                <td>`https://abc123.example.com/callback`</td>
+                <td>`アカウント > Redirect URI`</td>
+              </tr>
+                <tr>
+                  <td>Meta 側の Redirect Callback URL</td>
+                  <td>`https://abc123.example.com/callback`</td>
+                  <td>Meta App Dashboard</td>
+                </tr>
+                <tr>
+                  <td>Meta 側の Deauthorize Callback URL</td>
+                  <td>`https://abc123.example.com/api/meta/deauthorize`</td>
+                  <td>Meta App Dashboard</td>
+                </tr>
+                <tr>
+                  <td>Meta 側の Data Deletion Request URL</td>
+                  <td>`https://abc123.example.com/api/meta/data-deletion`</td>
+                  <td>Meta App Dashboard</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+      <section class="panel">
+        <div class="panel-header">
+          <div>
+            <p class="eyebrow">トラブル</p>
+            <h3>つまずきやすいポイント</h3>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>症状</th>
+                <th>原因</th>
+                <th>確認する場所</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>OAuth が開けない</td>
+                <td>Threads App ID / Secret / Redirect URI が未設定</td>
+                <td>`アカウント` 画面の `Threads連携`</td>
+              </tr>
+              <tr>
+                <td>認証後に交換で失敗する</td>
+                <td>コピーした `code` が違う、または Redirect URI が Meta 側と一致していない</td>
+                <td>Meta の Redirect Callback URL とアプリの Redirect URI</td>
+              </tr>
+              <tr>
+                <td>トークン更新できない</td>
+                <td>長期トークンが未取得、24時間未満、または失効済み</td>
+                <td>認証アラート、アカウント一覧の認証状態</td>
+              </tr>
+              <tr>
+                <td>返信が来ても自動返信されない</td>
+                <td>Webhook URL 未設定、返信ルールが無効、または Webhook 自体が未接続</td>
+                <td>`設定` と `返信` 画面</td>
+              </tr>
+              <tr>
+                <td>予約投稿が動かない</td>
+                <td>スケジューラ無効、PC停止、認証切れ</td>
+                <td>`設定` 画面、認証アラート</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </body>
+</html>

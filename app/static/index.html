@@ -1,0 +1,3467 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Threado | スレード</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <img src="/logo.png" alt="Threado スレード" class="brand-logo-img" />
+        </div>
+        <nav class="nav">
+          <p class="sidebar-caption">監視</p>
+          <button class="nav-link active" data-screen="dashboardScreen"><i data-lucide="layout-dashboard" class="nav-icon"></i>ダッシュボード</button>
+          <p class="sidebar-caption">準備</p>
+          <button class="nav-link" data-screen="manualScreen"><i data-lucide="book-open" class="nav-icon"></i>はじめ方</button>
+          <button class="nav-link" data-screen="settingsScreen"><i data-lucide="settings" class="nav-icon"></i>設定</button>
+          <button class="nav-link" data-screen="accountsScreen"><i data-lucide="user-circle" class="nav-icon"></i>アカウント</button>
+          <p class="sidebar-caption">手動運用</p>
+          <button class="nav-link" data-screen="researchScreen"><i data-lucide="search" class="nav-icon"></i>リサーチ</button>
+          <button class="nav-link" data-screen="knowledgeScreen"><i data-lucide="brain" class="nav-icon"></i>ナレッジ</button>
+          <button class="nav-link" data-screen="publishingScreen"><i data-lucide="send" class="nav-icon"></i>投稿</button>
+          <button class="nav-link" data-screen="repliesScreen"><i data-lucide="message-circle" class="nav-icon"></i>返信</button>
+          <p class="sidebar-caption">自律運用</p>
+          <button class="nav-link" data-screen="autoSelectScreen"><i data-lucide="bot" class="nav-icon"></i>アカウント選択</button>
+          <button class="nav-link" data-screen="autoDashScreen"><i data-lucide="activity" class="nav-icon"></i>運用ダッシュボード</button>
+          <button class="nav-link" data-screen="autoMonitorScreen"><i data-lucide="monitor" class="nav-icon"></i>AIモニター</button>
+          <button class="nav-link" data-screen="autoReportScreen"><i data-lucide="file-text" class="nav-icon"></i>日次レポート</button>
+          <button class="nav-link" data-screen="autoConfigScreen"><i data-lucide="sliders" class="nav-icon"></i>設定</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <section id="globalSystemBanner" class="auth-banner hidden"></section>
+        <section id="globalAuthBanner" class="auth-banner hidden"></section>
+
+        <!-- 初回起動セットアップウィザード（accounts=0 のとき自動表示） -->
+        <div id="setupWizardModal" class="modal-overlay" style="display:none"
+             onclick="if(event.target===this)closeSetupWizard()">
+          <div class="modal-content" style="max-width:680px;width:95vw">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+              <h3 style="margin:0">🎉 ようこそ — 初期設定ウィザード</h3>
+              <button type="button" onclick="closeSetupWizard()"
+                      style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)"
+                      title="閉じる">&times;</button>
+            </div>
+            <p class="muted" style="font-size:13px;margin-bottom:16px">
+              本番運用前に、安全な初期状態を 30 秒で整えます。各項目はあとから設定画面で変更できます。
+            </p>
+
+            <ol style="padding-left:20px;display:flex;flex-direction:column;gap:14px;margin:0">
+              <li>
+                <strong>セーフモード（推奨: ON）</strong>
+                <p class="muted" style="font-size:12px;margin:2px 0 6px">
+                  ON のとき、投稿・返信は <code>[SIMULATED]</code> ログだけ出力し外部に発信しません。
+                  実運用前のテストに必須です。
+                </p>
+                <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px">
+                  <input type="checkbox" id="setupSafeMode" checked> safe_mode を ON にする
+                </label>
+              </li>
+              <li>
+                <strong>スケジューラ（推奨: ON）</strong>
+                <p class="muted" style="font-size:12px;margin:2px 0 6px">
+                  ON で、予約投稿・返信処理・PDCA・シナリオ等のバックグラウンド処理が動きます。
+                </p>
+                <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px">
+                  <input type="checkbox" id="setupSchedulerEnabled" checked> scheduler_enabled を ON にする
+                </label>
+              </li>
+              <li>
+                <strong>AI CLI 検出</strong>
+                <p class="muted" style="font-size:12px;margin:2px 0 6px">
+                  投稿生成・返信生成・PDCA分析に AI CLI（Claude Code / Codex CLI）を使います。
+                  PATH 上にあれば自動検出します。下のボタンを押してください。
+                </p>
+                <button type="button" class="ghost-button" onclick="setupRunCliDetect(this)"
+                        style="font-size:12px">CLI 検出を実行</button>
+                <span id="setupCliResult" class="muted" style="font-size:12px;margin-left:8px"></span>
+              </li>
+              <li>
+                <strong>アカウント追加</strong>
+                <p class="muted" style="font-size:12px;margin:2px 0 6px">
+                  最後に Threads アカウントを追加します。Threads App ID / Secret /
+                  Redirect URI が必要です（Meta 開発者ポータルで取得）。
+                </p>
+              </li>
+            </ol>
+
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:18px;gap:8px;flex-wrap:wrap">
+              <label style="display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--muted)">
+                <input type="checkbox" id="setupSkipNextTime"> 今後表示しない
+              </label>
+              <div style="display:flex;gap:8px">
+                <button type="button" class="ghost-button" onclick="closeSetupWizard()">あとで</button>
+                <button type="button" class="primary-button" onclick="completeSetupWizard()">設定を保存してアカウント追加へ</button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section id="dashboardScreen" class="screen active">
+          <section class="screen-stack">
+
+            <!-- アプリ全体の状態 -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">全体</p>
+                  <h3>アプリ全体の登録状況</h3>
+                </div>
+                <button id="refreshBootstrapButton" class="primary-button">最新化</button>
+              </div>
+              <section class="card-grid" style="margin-top:12px">
+                <article class="metric-card"><p>登録アカウント数</p><strong id="accountCount">0</strong></article>
+                <article class="metric-card"><p>連携済みアカウント</p><strong id="connectedAccountCount">0</strong></article>
+                <article class="metric-card"><p>予約ジョブ</p><strong id="scheduledCount">0</strong></article>
+                <article class="metric-card"><p>ナレッジカード</p><strong id="knowledgeCardCount">0</strong></article>
+                <article class="metric-card"><p>返信イベント数</p><strong id="replyEventCount">0</strong></article>
+                <article class="metric-card" id="gasBridgeEventCard" style="display:none"><p>GAS受信数</p><strong id="gasBridgeEventCount">0</strong></article>
+              </section>
+            </article>
+
+            <!-- 取得できる指標・できない指標（折りたたみ） -->
+            <article class="panel">
+              <details>
+                <summary class="settings-group-heading" style="cursor:pointer;list-style:none">▶ このダッシュボードで確認できること・できないこと</summary>
+                <div style="margin-top:12px">
+                  <p class="muted" style="font-size:12px;margin-bottom:12px">
+                    Threads API の仕様上、取得できる指標とできない指標があります。「メトリクス更新」を実行するたびにスナップショットをDBに蓄積します。グラフや一覧はDBに蓄積されたデータをもとに描画します。
+                  </p>
+                  <div class="table-wrap">
+                    <table>
+                      <thead>
+                        <tr><th>指標</th><th>取得可否</th><th>このアプリでの扱い</th></tr>
+                      </thead>
+                      <tbody>
+                        <tr><td>フォロワー数</td><td><span class="status-pill pill-ok">取得可</span></td><td>「メトリクス更新」のたびに現在値を記録。フォロワー推移グラフに蓄積表示。</td></tr>
+                        <tr><td>アカウント全体の表示回数</td><td><span class="status-pill pill-ok">取得可</span></td><td>「メトリクス更新」のたびに現在値を記録。フォロワー推移グラフに重ねて表示可。</td></tr>
+                        <tr><td>投稿ごとの表示回数</td><td><span class="status-pill pill-ok">取得可</span></td><td>全投稿を対象に取得。投稿の実績グラフ・全投稿一覧・パフォーマンスサマリーに反映。</td></tr>
+                        <tr><td>投稿ごとのいいね・返信・リポスト・引用</td><td><span class="status-pill pill-ok">取得可</span></td><td>全投稿を対象に取得。投稿の実績グラフ・全投稿一覧・パフォーマンスサマリーに反映。</td></tr>
+                        <tr><td>フォロー数（自分がフォローしている数）</td><td><span class="status-pill pill-warn">取得不可</span></td><td>Threads API が非公開のため取得できません。</td></tr>
+                        <tr><td>リーチ数（ユニーク閲覧者数）</td><td><span class="status-pill pill-warn">取得不可</span></td><td>Threads API のインサイトエンドポイントに含まれていません。</td></tr>
+                        <tr><td>プロフィール閲覧数</td><td><span class="status-pill pill-warn">取得不可</span></td><td>Threads API のインサイトエンドポイントに含まれていません。</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </details>
+            </article>
+
+            <!-- アカウント別メトリクス -->
+            <article class="panel">
+
+              <!-- ① コントロール：アカウント選択 / 期間 / 取得ボタン -->
+              <div class="panel-header" style="margin-bottom:8px">
+                <div>
+                  <p class="eyebrow">アカウント別</p>
+                  <h3>メトリクスと推移グラフ</h3>
+                </div>
+              </div>
+              <div class="panel-controls-row">
+                <select id="dashboardAccountSelect" style="font-size:13px;padding:4px 8px"></select>
+                <span class="muted" style="font-size:11px">グラフ期間：</span>
+                <select id="dashboardPeriodSelect" style="font-size:13px;padding:4px 8px">
+                  <option value="7">1週間</option>
+                  <option value="30" selected>1ヶ月</option>
+                  <option value="90">3ヶ月</option>
+                  <option value="365">1年</option>
+                  <option value="0">全期間</option>
+                </select>
+                <span id="metricsLastUpdated" class="muted" style="font-size:11px"></span>
+                <span id="metricsAutoStatus" class="meta-pill" style="font-size:11px;display:none"></span>
+                <button type="button" id="dashboardRefreshMetricsDiffButton" class="ghost-button" style="font-size:12px;padding:3px 10px">差分取得</button>
+                <button type="button" id="dashboardRefreshMetricsFullButton" class="ghost-button" style="font-size:12px;padding:3px 10px">全件取得</button>
+              </div>
+              <p class="muted" style="font-size:12px">「差分取得」は前回以降の新着のみ更新（高速）。「全件取得」は全投稿を取り直し（投稿数が多いほど時間がかかります）。スケジューラは差分取得で自動実行されます。</p>
+
+              <!-- ② 指標サマリー：カード群 -->
+              <div class="panel-section">
+                <h3 class="panel-section-label">指標サマリー</h3>
+                <div id="accountMetricCards" class="card-row"></div>
+                <div id="todayMetricCards" class="card-row" style="margin-top:8px"></div>
+              </div>
+
+              <!-- ③ フォロワー推移グラフ -->
+              <div class="panel-section">
+                <h3 class="panel-section-label">フォロワー推移グラフ</h3>
+                <p class="muted" style="font-size:12px;margin-bottom:8px">取得のたびにスナップショットを蓄積します。取得回数が少ないほど折れ線が粗くなります。</p>
+                <div class="chart-controls" id="chartControls">
+                  <label class="checkbox-label"><input type="checkbox" id="chartMetricFollowers" checked> フォロワー数</label>
+                  <label class="checkbox-label"><input type="checkbox" id="chartMetricViews" checked> 表示回数（インプレッション）</label>
+                </div>
+                <div class="chart-container">
+                  <canvas id="metricsChart"></canvas>
+                </div>
+                <p class="muted" id="chartNote" style="font-size:11px;margin-top:6px"></p>
+                <div id="periodStats" style="display:none;margin-top:10px;margin-bottom:4px"></div>
+              </div>
+
+              <!-- ④ 投稿パフォーマンス（サマリー → 設定 → グラフ → 一覧） -->
+              <div class="panel-section">
+                <h3 class="panel-section-label">パフォーマンスサマリー</h3>
+                <p class="muted" style="font-size:12px;margin-bottom:10px">全投稿の最新メトリクスを合算した値です。取得回数が増えるほど精度が上がります。</p>
+                <div id="postAggregateCards" class="card-row" style="margin-bottom:20px"></div>
+
+                <h3 class="panel-section-label" style="margin-top:20px">全投稿一覧</h3>
+                <p class="muted" style="font-size:11px;margin-bottom:8px">下の絞り込み・並び順がグラフと一覧の両方に反映されます。「直近50件」は投稿日が新しい順。各指標ボタンはその指標TOP50を表示。</p>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+                  <div id="postSortButtons" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+                </div>
+                <div class="post-table-controls" id="postTableControls" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px">
+                  <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px">分析CLI<select id="analyzeCliSelect" style="font-size:12px;padding:2px 4px"></select></label>
+                  <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px">表示回数<input type="number" id="filterMinViews" min="0" value="0" style="width:60px;font-size:12px;padding:2px 4px">以上</label>
+                  <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px">いいね<input type="number" id="filterMinLikes" min="0" value="0" style="width:60px;font-size:12px;padding:2px 4px">以上</label>
+                  <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px">表示件数<select id="postPageSize" style="font-size:12px;padding:2px 4px"><option value="20" selected>20件</option><option value="50">50件</option><option value="100">100件</option></select></label>
+                  <button id="analyzeBuzzButton" class="ghost-button" style="font-size:12px;padding:3px 10px" onclick="analyzeBuzzFromDashboard()" title="表示中アカウントのTOP投稿をAIで分析してナレッジカードを生成します">📊 バズり投稿をナレッジ化</button>
+                  <button class="ghost-button" style="font-size:12px;padding:3px 10px;margin-left:auto" onclick="window.downloadPostsCsv()">CSVダウンロード</button>
+                </div>
+
+                <h3 class="panel-section-label" style="margin-bottom:8px">投稿ごとの実績グラフ</h3>
+                <p class="muted" style="font-size:12px;margin-bottom:8px">上の絞り込み結果（最大50件）を棒グラフで表示します。</p>
+                <div class="chart-controls">
+                  <label class="checkbox-label"><input type="checkbox" id="postChartMetricViews" checked> 表示回数</label>
+                  <label class="checkbox-label"><input type="checkbox" id="postChartMetricLikes" checked> いいね</label>
+                  <label class="checkbox-label"><input type="checkbox" id="postChartMetricReplies"> 返信</label>
+                  <label class="checkbox-label"><input type="checkbox" id="postChartMetricReposts"> リポスト</label>
+                  <label class="checkbox-label"><input type="checkbox" id="postChartMetricQuotes"> 引用</label>
+                </div>
+                <div class="chart-container" style="height:320px">
+                  <canvas id="postMetricsChart"></canvas>
+                </div>
+                <p class="muted" id="postChartNote" style="font-size:11px;margin-top:6px"></p>
+
+                <div style="margin-top:20px">
+                  <div id="postPager" style="display:flex;gap:4px;align-items:center;margin-bottom:8px"></div>
+                  <div id="dashboardPostsTable" class="table-wrap"></div>
+                </div>
+              </div>
+
+            </article>
+
+            <!-- 全アカウント状況 -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">状態監視</p>
+                  <h3>全アカウント状況</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-top:8px;margin-bottom:10px">連携中の全アカウントのフォロワー数・認証状態・トークン期限を一覧表示します。トークン期限はアカウント保存時またはトークン更新時に Threads API から取得した実際の有効期限です。</p>
+              <div id="dashboardAccountsTable" class="table-wrap"></div>
+            </article>
+
+            <!-- 投稿ジョブキュー -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">投稿キュー</p>
+                  <h3>スレードで管理している投稿ジョブ</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:10px">「ジョブ」とはスレードが管理する投稿の管理単位です。Threads 上の投稿そのものではなく、スレードで作成・予約した投稿の記録です。<br>直投稿：今すぐ投稿。予約投稿：指定日時に自動投稿。状態が「投稿準備完了」のものが次の投稿対象です。</p>
+              <div id="dashboardJobsTable" class="table-wrap"></div>
+            </article>
+
+          </section>
+        </section>
+
+        <section id="manualScreen" class="screen">
+
+          <!-- ═══════ 重要な注意事項 ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">はじめに</p>
+                <h3>Threado（スレード）とは</h3>
+              </div>
+            </div>
+            <p style="font-size:14px;line-height:1.8;margin-bottom:12px">Threads（スレッズ）の投稿・返信・リサーチ・分析をAIで自動化するローカルアプリです。<br>手動で1件ずつ投稿する「手動運用」と、AIが全自動でPDCAを回す「自律運用」の2つのモードがあります。</p>
+
+            <div class="rm-tip" style="margin:0 0 12px">
+              <strong>AI CLI の互換性</strong><br>
+              このアプリは AI CLI ツール（<strong>Claude Code</strong> または <strong>Codex CLI</strong>）経由で AI を呼び出します。<br>
+              いずれも検出・呼び出しに対応しており、設定画面の「動作確認」ボタンで PONG 応答を確認すれば本番投入可能です。<br>
+              アカウントごとに使う CLI を切り替えることもできます（アカウント編集の「優先AI CLI」）。
+            </div>
+            <div class="rm-tip" style="margin:0">
+              <strong>このアプリ自体をAIで改修するには？</strong><br>
+              このアプリはPythonとHTML/CSS/JSで書かれています。Claude Codeでこのフォルダを開けば、機能追加・バグ修正・デザイン変更をAIに指示できます。<br>
+              ターミナルで <code>cd このアプリのフォルダ</code> → <code>claude</code> と打てばClaude Codeが起動します。<br>
+              「○○の機能を追加して」「○○が動かないから直して」と日本語で指示すればOKです。
+            </div>
+          </section>
+
+          <!-- ═══════ PART 0: インストール ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">PART 0</p>
+                <h3>インストールと起動</h3>
+              </div>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px">zipを受け取ってから画面を開くまでの手順です。パソコンに不慣れな方もここから読めば大丈夫です。</p>
+
+            <div class="roadmap">
+
+              <details class="rm-step">
+                <summary>ステップ1: Pythonをインストールする <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p><a href="https://www.python.org/downloads/" target="_blank" rel="noreferrer" class="rm-link-btn">https://www.python.org/downloads/</a> を開いて「Download Python」ボタンからダウンロードしてインストールしてください。</p>
+                  <div class="rm-warn"><strong>インストール時に必ず「Add Python to PATH」にチェックを入れてください。</strong>チェックを忘れるとアプリが動きません。忘れた場合はアンインストールしてやり直すのが一番簡単です。</div>
+                </div>
+              </details>
+
+              <details class="rm-step">
+                <summary>ステップ2: Claude Codeをインストールする <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p><a href="https://claude.ai/code" target="_blank" rel="noreferrer" class="rm-link-btn">https://claude.ai/code</a> を開いてインストールしてログインしてください。</p>
+                  <p>Codex CLI でも動作しますが、初めての方は Claude Code を推奨します。</p>
+                  <div class="rm-tip">案内ページからのインストールでうまくいかない場合は、コマンドプロンプトで <code>npm install -g @anthropic-ai/claude-code</code> でも入ります（要 <a href="https://nodejs.org/" target="_blank" rel="noreferrer">Node.js</a>）。Codex CLI は <code>npm install -g @openai/codex</code>。</div>
+                </div>
+              </details>
+
+              <details class="rm-step">
+                <summary>ステップ3: 受け取ったzipファイルを展開する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p>受け取ったzipファイルをダブルクリックして「すべて展開」を選んでください。</p>
+                  <p>展開したフォルダはわかりやすい場所に置いてください（例: <code>C:\Threado\</code>）。</p>
+                  <div class="rm-warn"><strong>一度置いたフォルダは移動しないでください。</strong>移動するとサービスが起動しなくなります。</div>
+                </div>
+              </details>
+
+              <details class="rm-step">
+                <summary>ステップ4: setup.batを管理者として実行する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p>展開したフォルダの中の <strong>「setup.bat」</strong> を右クリックして <strong>「管理者として実行」</strong> を選んでください。</p>
+                  <p>以下が自動で完了します:</p>
+                  <ul>
+                    <li>必要なライブラリのインストール</li>
+                    <li>Windowsサービスの登録・自動起動設定</li>
+                    <li>デスクトップに「Threado」アイコンの自動作成</li>
+                  </ul>
+                </div>
+              </details>
+
+              <details class="rm-step">
+                <summary>ステップ5: デスクトップのThreadoアイコンをダブルクリックする <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p>デスクトップに作成された <strong>「Threado」アイコン</strong> をダブルクリックするとアプリが起動します。</p>
+                  <p>次回からはこのアイコンをダブルクリックするだけでOKです。</p>
+                  <p>PCを再起動しても自動でサービスが立ち上がります。</p>
+                </div>
+              </details>
+
+            </div>
+          </section>
+
+          <!-- ═══════ PART 1: 初期設定ロードマップ ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">PART 1</p>
+                <h3>初期設定ロードマップ — 1アカウント動かすまで</h3>
+              </div>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px">上から順番にやれば、1アカウントの自律運用まで到達できます。各ステップをクリックすると詳細が開きます。</p>
+
+            <div class="roadmap">
+
+              <!-- STEP 1: Meta設定 -->
+              <details class="rm-step">
+                <summary>ステップ1: Meta for DevelopersでThreads APIアプリを作る <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p>Threads APIを使うには、まずMeta側でアプリを作成してAPIキーを取得する必要があります。</p>
+
+                  <h4>やること</h4>
+                  <ul>
+                    <li><a href="https://developers.facebook.com/" target="_blank" rel="noreferrer" class="rm-link-btn">https://developers.facebook.com/</a> を開いてログインする</li>
+                    <li>「マイアプリ」→「アプリを作成」を押す</li>
+                    <li>アプリの種類で <strong>「その他」</strong>→<strong>「ビジネス」</strong> を選択</li>
+                    <li>アプリ名を入力して作成する</li>
+                    <li>左メニューの「製品を追加」で <strong>「Threads API」</strong> の「設定」を押す</li>
+                    <li><strong>「Threads App ID」</strong> と <strong>「Threads App Secret」</strong> をコピーする<br>
+                      <span class="muted" style="font-size:12px">※通常の「App ID / App Secret」ではなく Threads API 専用の値を使う</span></li>
+                  </ul>
+
+                  <h4>コールバックURLを3本登録する</h4>
+                  <ul>
+                    <li><strong>Redirect Callback URL</strong>: <code>https://あなたのドメイン/callback</code></li>
+                    <li><strong>Deauthorize Callback URL</strong>: <code>https://あなたのドメイン/api/meta/deauthorize</code></li>
+                    <li><strong>Data Deletion Request URL</strong>: <code>https://あなたのドメイン/api/meta/data-deletion</code></li>
+                  </ul>
+                  <div class="rm-warn">localhost はNG。HTTPS必須。ローカルで動かす場合は GAS ブリッジか ngrok で HTTPS 化が必要です。</div>
+
+                  <h4>以下のスコープが有効になっていることを確認する</h4>
+                  <ul>
+                    <li><code>threads_basic</code></li>
+                    <li><code>threads_content_publish</code></li>
+                    <li><code>threads_manage_insights</code></li>
+                    <li><code>threads_manage_replies</code></li>
+                    <li><code>threads_read_replies</code></li>
+                  </ul>
+                </div>
+              </details>
+
+              <!-- STEP 2: アプリ初期設定 -->
+              <details class="rm-step">
+                <summary>ステップ2: このアプリの初期設定をする <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p>デスクトップの <strong>「Threado」アイコン</strong> をダブルクリックしてアプリを起動してください。</p>
+                  <p>左メニューの <strong>「設定」</strong> を開いて以下を確認・保存します。</p>
+                  <ul>
+                    <li><strong>スケジューラ</strong>: <strong>ON</strong> にする</li>
+                    <li><strong>セーフモード</strong>: <strong>ON</strong> にする（最初は必ず ON で始める）</li>
+                    <li><strong>「CLIを検出」</strong> ボタンを押す → <strong>Claude Code</strong> が「利用可」になればOK<br>
+                      <span class="muted" style="font-size:12px">「動作確認」ボタンで PONG が返れば本番運用可能</span></li>
+                    <li><strong>「設定を保存」</strong> を押す</li>
+                  </ul>
+                </div>
+              </details>
+
+              <!-- STEP 3: アカウント作成 -->
+              <details class="rm-step">
+                <summary>ステップ3: アカウントを作成してAPI情報を入力する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p>左メニューの <strong>「アカウント」</strong> を開きます。</p>
+                  <ul>
+                    <li><strong>表示名 / ユーザー名 / 発信ジャンル / 運用モード</strong> を入力する</li>
+                    <li><strong>Threads App ID / Threads App Secret / Redirect URI</strong> を入力する</li>
+                    <li><strong>優先AI CLI</strong> をアカウントごとに選択できます（Claude Code / Codex CLI）</li>
+                    <li><strong>「アカウントを保存」</strong> を押す</li>
+                  </ul>
+                  <div class="rm-tip">保存後、画面下部の「連携URLガイド」にMeta側に登録すべき3本のURLが表示されます。</div>
+                </div>
+              </details>
+
+              <!-- STEP 4: OAuth認証 -->
+              <details class="rm-step">
+                <summary>ステップ4: OAuth認証でThreadsと接続する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p>アカウント画面の <strong>「OAuth URLを開く」</strong> を押す<br>
+                    → Threads の許可画面で <strong>「許可」</strong> を押す<br>
+                    → 自動でアプリに戻りトークンが保存される</p>
+                  <p>認証成功するとアカウント横のアラートが消えます。</p>
+                  <div class="rm-tip">長期トークンは60日で期限切れしますが、アプリが <strong>7日前に警告を出します</strong>。期限が近づいたらアカウント画面で再認証してください。</div>
+                  <div class="rm-warn" style="font-size:12px">うまく戻らない場合は、URL バーに表示される <code>?code=xxx</code> をコピーして「認証コードを交換」に貼り付けてください。</div>
+                </div>
+              </details>
+
+            </div>
+          </section>
+
+          <!-- ═══════ PART 2: 手動運用マニュアル ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">PART 2</p>
+                <h3>手動運用マニュアル — 各画面の使い方</h3>
+              </div>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px">手動運用で使う4つの画面を解説します。自律運用でもこれらの機能は裏で使われているので、理解しておくと全体像が掴めます。</p>
+
+            <!-- リサーチ画面 -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#dbeafe;color:#2563eb">&#x1f50d;</span>
+                リサーチ画面 — 競合を調べてバズの型を見つける
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>同じジャンルの競合アカウントを自動調査し、「どんな投稿がバズるか」のパターンを見つけます。</p>
+
+                <h5>リサーチの作成</h5>
+                <ol>
+                  <li>左メニュー「リサーチ」→「新規リサーチ」</li>
+                  <li><strong>アカウント</strong>を選択（どのアカウントのジャンルで調べるか）</li>
+                  <li><strong>CLI</strong>を選択（Claude Code を推奨）</li>
+                  <li><strong>対象アカウント数</strong>（10推奨）— 何アカウント調べるか</li>
+                  <li><strong>抽出投稿数</strong>（10推奨）— 各アカウントから何件バズ投稿を取るか</li>
+                  <li>「リサーチを保存」を押す</li>
+                </ol>
+
+                <h5>リサーチの実行</h5>
+                <ol>
+                  <li>保存したリサーチの「AIでリサーチ実行」を押す</li>
+                  <li>AIがDuckDuckGoで競合アカウントを検索 → 各アカウントのバズ投稿を分析</li>
+                  <li>数分〜10分かかる（アカウント数×投稿数による）</li>
+                  <li>完了したら結果を確認。次に「型を分析してナレッジ化」を押す</li>
+                </ol>
+
+                <h5>ナレッジ化</h5>
+                <p>リサーチ結果からAIがバズの「型（パターン）」を抽出し、ナレッジカードとして保存します。これが投稿生成の素材になります。</p>
+
+                <div class="rm-tip">リサーチは1ジャンルにつき最初の1回が特に重要です。ナレッジカードが0枚だとAIは投稿を作れません。</div>
+              </div>
+            </details>
+
+            <!-- ナレッジ画面 -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#dcfce7;color:#16a34a">&#x1f4da;</span>
+                ナレッジ画面 — 投稿の型（パターン）を管理する
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>ナレッジカードは「この型で投稿するとバズりやすい」というAIへの指示書です。</p>
+
+                <h5>カードの見方</h5>
+                <ul>
+                  <li><strong>カード名</strong> — パターンの名前（例:「ストーリー型・共感誘引」）</li>
+                  <li><strong>カードタイプ</strong> — 構成型・CTA型・ストーリー型など24種類</li>
+                  <li><strong>スコア</strong> — 0〜100点。高いほどバズりやすいと判断されている</li>
+                  <li><strong>使用回数</strong> — このカードで何回投稿したか</li>
+                  <li><strong>有効/無効</strong> — 無効にすると投稿生成で使われなくなる</li>
+                </ul>
+
+                <h5>手動で操作できること</h5>
+                <ul>
+                  <li>カードの<strong>有効/無効</strong>切り替え — 使いたくないパターンをOFFにできる</li>
+                  <li>カードの<strong>内容を編集</strong> — AIが生成した型を手動で調整できる</li>
+                  <li>カードの<strong>新規作成</strong> — 自分でパターンを書いて追加できる</li>
+                  <li>カードの<strong>削除</strong></li>
+                </ul>
+
+                <h5>カードの種類（手動 vs 自律運用）</h5>
+                <div class="rm-warn">
+                  <strong>手動運用で作られるカード:</strong><br>
+                  ・<strong>リサーチ由来</strong> — 手動リサーチ→ナレッジ化で作成（初期スコア50）<br>
+                  ・<strong>勝ちパターン</strong> — リサーチ中で最もバズった投稿の特別分析結果<br><br>
+                  <strong>自律運用でのみ自動生成されるカード:</strong><br>
+                  ・<strong>PDCA学習</strong> — 日次PDCA分析で発見された成功パターン（スコア60）<br>
+                  ・<strong>失敗パターン</strong> — 成績が悪かった投稿の「やるな」リスト（スコア30）<br>
+                  ・<strong>他アカウント参考</strong> — 他アカウントで成功した戦略の参考（スコア35）<br><br>
+                  手動運用では上2つだけ。自律運用にするとAIが自動で下3つも作り、カードが自動進化していきます。
+                </div>
+                <div class="rm-warn">
+                  <strong>自律運用カードが作られる条件（重要）:</strong><br>
+                  ・<strong>セーフモードON中は作られません。</strong>シミュレーション投稿にはメトリクス（ビュー・いいね等）が付かないため、PDCA分析が成功/失敗を判断できません<br>
+                  ・<strong>PDCA学習</strong> — セーフモードOFFで実投稿し、メトリクスが取得された翌日のPDCA分析で初めて作成されます<br>
+                  ・<strong>失敗パターン</strong> — トップ投稿のエンゲージメントの1/3以下の投稿がある場合のみ作成。明らかな差がないと作られません<br>
+                  ・<strong>他アカウント参考</strong> — 自動モードのアカウントが<strong>2つ以上</strong>必要です。1アカウント運用では作られません<br><br>
+                  つまり: セーフモードOFF → 数日間実投稿 → メトリクス蓄積 → PDCA分析が自動でカード生成、という流れです。
+                </div>
+
+                <div class="rm-tip">24種類のカードタイプ（構成型・ストーリー型・教育型など）はどちらのモードでも共通です。リサーチで抽出されるパターンの分類名です。</div>
+
+                <h5>ナレッジアップロード <span class="rm-badge" style="background:#fef3c7;color:#d97706">新機能</span></h5>
+                <p>テキスト・PDF・Word ファイルを直接アップロードして、その内容から AI に「投稿の型」を自動生成させる機能です。リサーチを介さず、手元の資料・書籍・メモから直接ナレッジを作れます。</p>
+
+                <h5>対応フォーマット</h5>
+                <ul>
+                  <li><code>.txt</code> / <code>.md</code> — そのままテキスト抽出</li>
+                  <li><code>.pdf</code> — pypdf で本文抽出</li>
+                  <li><code>.docx</code> — python-docx で本文抽出</li>
+                </ul>
+                <div class="rm-warn">画像のみの PDF（OCR 必要なもの）はテキスト抽出できません。テキスト選択可能な PDF を使ってください。1ファイル 20MB まで。</div>
+
+                <h5>使いどころの例</h5>
+                <ul>
+                  <li><strong>運用方針メモ</strong> — 「うちはこういう投稿はNG」「このトーンで」と書いた .md を入れる</li>
+                  <li><strong>商材資料</strong> — サービスの PDF パンフレット / 営業資料を入れて、その内容に沿った投稿の型を作る</li>
+                  <li><strong>競合の名作集</strong> — バズ投稿のスクショ書き起こしを .txt にまとめて入れる</li>
+                  <li><strong>書籍からの抽出</strong> — マーケ本や心理学本から「使えるフレーズ」だけを .md にして入れる</li>
+                </ul>
+
+                <h5>使い方</h5>
+                <ol>
+                  <li>左メニュー「ナレッジ」→ ナレッジアップロードのパネル</li>
+                  <li><strong>カテゴリを作成</strong>（例: 「商材A 営業資料」「運用ルール」）— アカウント単位でも全アカウント共通でも可</li>
+                  <li>カテゴリの「ファイルを追加」で対象ファイルを投入 → 自動でテキスト抽出</li>
+                  <li>「投稿の型を生成」ボタン → AI が抽出テキストから「投稿パターン」をナレッジカードとして自動生成</li>
+                  <li>生成されたカードは通常のナレッジカードとして使える（PDCA でスコア更新も対象）</li>
+                </ol>
+
+                <div class="rm-tip">アップロードしたファイル本体は保存せず、抽出テキストだけを DB に持ちます。元ファイルを差し替えたい時は同じカテゴリに再アップロードすればOK。「全アカウント共通」のシステムナレッジ（マーケ土台知識）も同じ仕組みで管理されています。</div>
+              </div>
+            </details>
+
+            <!-- 投稿画面 -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fef3c7;color:#d97706">&#x1f4dd;</span>
+                投稿画面 — AI生成して投稿する
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <h5>投稿の作成手順</h5>
+                <ol>
+                  <li>左メニュー「投稿」→ フォームに入力:
+                    <ul>
+                      <li><strong>アカウント</strong> — どのアカウントで投稿するか</li>
+                      <li><strong>CLI</strong> — Claude Code を選択</li>
+                      <li><strong>投稿モード</strong> — 「直投稿」（すぐ投稿）or「予約」（時間指定）</li>
+                      <li><strong>投稿指示</strong> — AIへの指示（例:「AIツールの活用法について教育的な投稿」）</li>
+                    </ul>
+                  </li>
+                  <li>「ジョブを保存」を押す</li>
+                  <li>「本文を生成」を押す → AIがナレッジカードとジャンルを参考に投稿文を作成</li>
+                  <li>生成された本文を確認・必要なら手動で編集</li>
+                  <li>「今すぐ実行」で投稿（セーフモードONならシミュレーションのみ）</li>
+                </ol>
+
+                <h5>投稿モードの違い</h5>
+                <ul>
+                  <li><strong>直投稿</strong> — 「今すぐ実行」で即座に投稿される</li>
+                  <li><strong>予約投稿</strong> — 日時を指定すると、スケジューラがその時刻に自動投稿</li>
+                </ul>
+
+                <h5>スレッド投稿（連投）</h5>
+                <p>1つの投稿が500文字を超えたり、AIが「---」区切りで複数パートを生成した場合、自動でスレッド（連投）として投稿されます。</p>
+
+                <div class="rm-tip">投稿指示が空でもナレッジカードとジャンルだけでAIは文章を作れます。ただし具体的な指示があるほうが質は上がります。</div>
+              </div>
+            </details>
+
+            <!-- 返信画面 -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#f3e8ff;color:#9333ea">&#x1f4ac;</span>
+                返信画面 — 自動返信ルールを設定する
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>自分の投稿にコメントが来たとき、自動で返信する仕組みです。</p>
+
+                <h5>返信ルールの作成</h5>
+                <ol>
+                  <li>左メニュー「返信」→「新規ルール」</li>
+                  <li><strong>アカウント</strong>を選択</li>
+                  <li><strong>キーワード</strong>を設定 — コメントにこの単語が含まれたら返信する（空欄 = 全コメントに返信）</li>
+                  <li><strong>返信テンプレート</strong>を書く:
+                    <ul>
+                      <li>固定テキスト: そのまま返信される</li>
+                      <li><code>{{ai}}</code> を含める: AIがコメント内容に合わせて返信文を生成</li>
+                      <li><code>{{username}}</code>: コメント者のユーザー名に置換</li>
+                    </ul>
+                  </li>
+                  <li>「保存」を押す</li>
+                </ol>
+
+                <h5>返信の仕組み</h5>
+                <div class="alc-flow">コメント検出（30秒ごとのポーリング or GAS Webhook）
+  → キーワードマッチ判定
+  → ランダム遅延（5〜30秒 — 人間っぽく見せる）
+  → テンプレート置換 or AI生成
+  → 返信投稿（セーフモードならシミュレーション）
+  → 失敗時は最大3回リトライ</div>
+
+                <h5>投稿別返信（自律運用で自動作成）</h5>
+                <p>自律運用で投稿すると、その投稿に対して自動で「全コメントにAI返信」設定が付きます。手動で設定する必要はありません。</p>
+
+                <h5>シナリオ分岐型自動リプライ <span class="rm-badge" style="background:#fef3c7;color:#d97706">新機能</span></h5>
+                <p>キーワードトリガーで起動する <strong>多段ステップ配信</strong> です。「ある特定の単語が含まれるコメント」に対して、複数の返信を時間差（Day-N方式）で自動送信できます。</p>
+
+                <h5>使いどころの例</h5>
+                <ul>
+                  <li><strong>資料請求の自動誘導</strong> — 「資料」というコメントに対して、すぐ DM 案内 → 1日後に補足 → 3日後にフォロー の3ステップで配信</li>
+                  <li><strong>濃いリードの育成</strong> — 「興味あります」コメントに対して、初日に詳細 LP リンク → 2日後にお客様の声 → 5日後に限定オファー</li>
+                  <li><strong>サポート1次受け</strong> — 「使い方」コメントに対して、即時にチュートリアル動画 → 翌日に FAQ ページ</li>
+                </ul>
+
+                <h5>シナリオの作成</h5>
+                <ol>
+                  <li>左メニュー「返信」→ シナリオパネルの「新規シナリオ」</li>
+                  <li><strong>アカウント</strong>を選択</li>
+                  <li><strong>トリガーキーワード</strong>を設定（部分一致 / 完全一致 / 正規表現）</li>
+                  <li><strong>ステップを追加</strong>:
+                    <ul>
+                      <li>各ステップに「待機時間（時間単位）」と「メッセージテンプレート」を設定</li>
+                      <li>テンプレ内で <code>{{ai}}</code> や <code>{{username}}</code> も使える</li>
+                    </ul>
+                  </li>
+                  <li>「シナリオを保存」を押す</li>
+                </ol>
+
+                <h5>動作の仕組み</h5>
+                <div class="alc-flow">トリガーキーワードを含むコメントを検出
+  → 該当コメント主向けに進行レコード作成
+  → 30秒スケジューラがステップ毎の待機時間を計測
+  → 配信時刻が来たら、前のステップへ返信スレッドの形で自動投稿
+  → 全ステップ完了 or 途中の別キーワードで分岐</div>
+
+                <div class="rm-tip">同じユーザに対してシナリオは1本まで（重複起動しない）。シナリオ進行中の状態は「シナリオ進行」テーブルでいつでも確認・停止できます。</div>
+              </div>
+            </details>
+
+            <!-- ダッシュボード -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fce7f3;color:#db2777">&#x1f4ca;</span>
+                ダッシュボード — 全体の状態を確認する
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>アプリ起動時に表示される画面で、全アカウントの状態が一目でわかります。</p>
+
+                <h5>表示される情報</h5>
+                <ul>
+                  <li><strong>アカウント一覧</strong> — 各アカウントの認証状態・運用モード・直近の投稿</li>
+                  <li><strong>予約投稿</strong> — 今後の予約済み投稿の一覧</li>
+                  <li><strong>フォロワー推移グラフ</strong> — 過去のフォロワー数の変化</li>
+                  <li><strong>投稿パフォーマンス</strong> — 最近の投稿のビュー・いいね・返信数</li>
+                </ul>
+
+                <h5>認証アラート</h5>
+                <p>トークン期限切れや認証エラーがあるアカウントは、画面上部にバナーで警告が表示されます。</p>
+              </div>
+            </details>
+
+          </section>
+
+          <!-- ═══════ PART 3: 自律運用マニュアル ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">PART 3</p>
+                <h3>自律運用マニュアル — AIの頭の中</h3>
+              </div>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px">自律運用をONにするとAIが全自動でPDCAを回します。AIが内部でどう判断しているかを解説します。</p>
+
+            <!-- 自律運用への切替手順 -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#f1f5f9;color:#475569">&#x1f680;</span>
+                自律運用への切替手順と前提条件
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <h5>ONにする前の最低条件</h5>
+                <ul>
+                  <li>設定画面: スケジューラ ON / セーフモード ON（最初はON推奨）</li>
+                  <li>アカウント: OAuth認証済み / 発信ジャンル入力済み</li>
+                  <li>ナレッジ: 有効なカード最低1枚（3枚以上推奨）</li>
+                  <li>CLI: Claude Code が検出済み</li>
+                </ul>
+
+                <h5>切替手順</h5>
+                <ol>
+                  <li>左メニューの <strong>「アカウント選択」</strong>（自律運用セクション）を開く</li>
+                  <li>対象アカウントの <strong>「自動に切替」</strong> を押す</li>
+                  <li>確認ダイアログで「OK」</li>
+                </ol>
+
+                <h5>自律運用の設定（左メニュー「設定」自律運用セクション）</h5>
+                <ul>
+                  <li><strong>1日の投稿目標数</strong> — 最初は3件がおすすめ</li>
+                  <li><strong>投稿時間帯</strong> — 例: 09:00〜21:00</li>
+                  <li><strong>最低投稿間隔</strong> — 60分がおすすめ（連投防止）</li>
+                </ul>
+
+                <div class="rm-warn"><strong>投稿目標数 × 間隔 ≦ 時間帯の長さ を確認してください。</strong><br>
+                例: 目標15件・間隔60分・時間帯9:00〜21:00 → 12時間÷60分=最大12件しか投稿不可。<br>
+                さらに18:00に起動した場合は残り3時間で最大3件のみ。<strong>追いつき機能はありません</strong>（間隔を無視した連投はしない）。</div>
+
+                <h5>セーフモードの解除</h5>
+                <p>AIモニター画面で数日分の生成内容を確認し、問題なければ設定画面で <strong>セーフモード OFF</strong> にします。以後、実際にThreadsに投稿されます。</p>
+              </div>
+            </details>
+
+            <!-- 4フェーズサイクル -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#dbeafe;color:#2563eb">1</span>
+                5分ごとの投稿判断サイクル（ASSESS → DECIDE → POST → SUPPORT）
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>AutoPlannerは5分ごとに全自動アカウントに対して4フェーズのサイクルを実行します。</p>
+
+                <h5>Phase 1: ASSESS（状況把握）</h5>
+                <p>AIは以下の情報をすべて読み込みます:</p>
+                <ul>
+                  <li>今日の投稿数（手動・自動・キュー含む全合計）</li>
+                  <li>前回投稿からの経過時間</li>
+                  <li>予約投稿の予定</li>
+                  <li>投稿時間帯の設定（例: 9:00〜21:00 JST）</li>
+                  <li>AI予算の残り</li>
+                </ul>
+
+                <h5>Phase 2: DECIDE（判断）</h5>
+                <p>以下の順番でチェックし、1つでもNGなら投稿しません:</p>
+                <div class="alc-flow">① 今は投稿時間帯内か？ → 時間外ならスキップ
+② 今日の目標数に達しているか？ → 達成済みならスキップ
+③ 前回投稿から最低間隔（例:60分）経ったか？ → まだならスキップ
+④ 直近に予約投稿が控えていないか？ → 控えてるならスキップ
+→ 全パスなら投稿する</div>
+
+                <h5>Phase 3: POST（投稿）</h5>
+                <ol>
+                  <li>投稿目的を選ぶ（不足している目的を優先 = deficit計算）</li>
+                  <li>ナレッジカードを選ぶ（スコアが高いほど選ばれやすい）</li>
+                  <li>失敗パターンを読み込む（「これはやるな」リスト）</li>
+                  <li>AIで投稿文を生成</li>
+                  <li>投稿実行（セーフモードならシミュレーションのみ）</li>
+                  <li>自動返信設定を作成（投稿へのコメントにAIが返す）</li>
+                </ol>
+
+                <h5>Phase 4: SUPPORT（支援タスク）</h5>
+                <ul>
+                  <li>リサーチが必要なら自動実行（条件は後述）</li>
+                  <li>ナレッジカード抽出（リサーチ完了後に自動）</li>
+                  <li>競合エンゲージメント（ON設定時のみ）</li>
+                  <li>メトリクス取得（フォロワー数・投稿パフォーマンス）</li>
+                </ul>
+
+                <div class="rm-tip"><strong>アプリを閉じると全て停止します。</strong>自律運用はアプリが起動している間だけ動作します。PCのスリープ中も停止します。</div>
+              </div>
+            </details>
+
+            <!-- 投稿目的の選び方 -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#dcfce7;color:#16a34a">2</span>
+                投稿目的の選び方（deficit計算）
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>AIは「教育25% / 交流25% / 共感20% / ブランド15% / エンタメ15%」のような目的ミックス設定に基づいて、<strong>今日足りていない目的</strong>を優先的に選びます。</p>
+
+                <h5>5つの投稿目的</h5>
+                <ul>
+                  <li><strong>教育（education）</strong> — 知識・ノウハウを教える投稿</li>
+                  <li><strong>交流（interaction）</strong> — 質問・アンケートなどエンゲージメントを誘う投稿</li>
+                  <li><strong>共感（empathy）</strong> — 体験談・感情を共有する投稿</li>
+                  <li><strong>ブランド（branding）</strong> — 実績・専門性をアピールする投稿</li>
+                  <li><strong>エンタメ（entertainment）</strong> — 面白い・癒される投稿</li>
+                </ul>
+
+                <h5>例: 今日の目標3件で1件投稿済み（教育）の場合</h5>
+                <div class="alc-flow">教育:   目標 0.75件 − 実績 1件 = 差分 -0.25 ← 足りてる
+交流:   目標 0.75件 − 実績 0件 = 差分 +0.75 ← 不足!
+共感:   目標 0.60件 − 実績 0件 = 差分 +0.60
+ブランド: 目標 0.45件 − 実績 0件 = 差分 +0.45
+エンタメ: 目標 0.45件 − 実績 0件 = 差分 +0.45
+
+→ 最も不足している「交流」を選択</div>
+
+                <p>この比率はPDCA分析で自動調整されます。エンゲージメントが高い目的の比率が上がり、低い目的の比率が下がります。</p>
+              </div>
+            </details>
+
+            <!-- ナレッジカードの仕組み -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fef3c7;color:#d97706">3</span>
+                ナレッジカードの自動進化（スコア・選択・引退）
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <h5>自律運用で自動生成されるカードの種類</h5>
+                <ul>
+                  <li><strong>リサーチ由来</strong> — 競合分析で見つけたバズパターン（初期スコア50）。手動リサーチでも作られる</li>
+                  <li><strong>勝ちパターン</strong> — リサーチの中で最もバズった投稿の分析結果。手動リサーチでも作られる</li>
+                  <li><strong>PDCA学習</strong> — 日次PDCA分析から生まれた成功パターン（スコア60）<span style="color:#dc2626;font-weight:700">★自律運用のみ</span></li>
+                  <li><strong>失敗パターン</strong> — 成績が悪かった投稿の「やるな」リスト（スコア30）<span style="color:#dc2626;font-weight:700">★自律運用のみ</span></li>
+                  <li><strong>他アカウント参考</strong> — 他のアカウントで成功した戦略の参考（スコア35）<span style="color:#dc2626;font-weight:700">★自律運用のみ</span></li>
+                </ul>
+
+                <h5>スコアの動き方（改善ループ = 10分ごと自動実行）</h5>
+                <p>過去30日の投稿実績を見て、カードごとの平均エンゲージメントをスコア（0〜100）に変換します。</p>
+                <ul>
+                  <li>スコアが高い → 投稿時に選ばれやすい → さらにデータが溜まる → スコアが精緻化</li>
+                  <li><strong>スコア20未満 → 自動で無効化</strong>（もう使われなくなる）</li>
+                  <li>PDCA学習カードは30日経つと自動引退（古い学びは捨てて新しい学びへ）</li>
+                  <li>アクティブカードは最大30枚まで。超えたら低スコアから引退</li>
+                </ul>
+
+                <h5>カード選択の仕組み</h5>
+                <p>スコア加重ランダム。スコア80のカードはスコア20のカードより4倍選ばれやすいが、最低重み10があるので低スコアにもチャンスあり。<strong>完全にランダムではなく、実績に基づいた確率選択です。</strong></p>
+
+                <div class="rm-warn"><strong>PDCA学習・失敗パターン・他アカウント参考のカードが作られるには:</strong><br>
+                ① セーフモードをOFFにして実投稿する<br>
+                ② メトリクス（ビュー・いいね等）がThreads APIから取得される（数時間〜翌日）<br>
+                ③ 翌日のPDCA分析で成功/失敗を判断 → カード自動生成<br><br>
+                セーフモードON中はメトリクスが0のためカードは生成されません。<br>
+                「他アカウント参考」は自動モードのアカウントが2つ以上ないと作られません。</div>
+              </div>
+            </details>
+
+            <!-- PDCA分析 -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#f3e8ff;color:#9333ea">4</span>
+                毎日のPDCA分析（何を見て何を変えるか）
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>毎日1回、設定した時刻（デフォルト9時 JST）にAIが前日の投稿を分析します。</p>
+
+                <h5>AIが見ているもの</h5>
+                <ul>
+                  <li>前日の全投稿のビュー数・いいね・返信・リポスト</li>
+                  <li>フォロワーの増減</li>
+                  <li>前回・前々回のPDCA分析結果（学習の連続性を保つ）</li>
+                  <li>現在の投稿目的ミックス比率</li>
+                  <li>アクティブなディレクティブ（ユーザーからの指示）</li>
+                </ul>
+
+                <h5>AIが変えるもの</h5>
+                <ul>
+                  <li><strong>投稿目的ミックス</strong>の比率を調整（各目的は最低5%を保証、急激な変動は防ぐ）</li>
+                  <li><strong>成功パターンカード</strong>を作成（エンゲージメント上位の投稿から学習）</li>
+                  <li><strong>失敗パターンカード</strong>を作成（エンゲージメントが上位の1/3以下の投稿）</li>
+                  <li>他アカウントとの<strong>クロス学習</strong>（Aで失敗してBで成功した戦略を参考カード化）</li>
+                </ul>
+
+                <h5>自動リサーチのトリガー</h5>
+                <p>分析結果に「低下」「不足」「苦戦」等のネガティブワードが含まれると、自動で競合リサーチを再実行します。</p>
+
+                <h5>ディレクティブ（運用指示）</h5>
+                <p>自律運用画面から「ディレクティブ」を追加すると、AIの投稿内容に影響を与えます。例: 「今週はAI活用の具体事例を重点的に」「CTAに必ずこのURLを入れて」など。期間指定も可能。</p>
+              </div>
+            </details>
+
+            <!-- 競合エンゲージメント -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">5</span>
+                競合エンゲージメント（いいね・コメント・引用）
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>競合アカウントの投稿に自動で絡みに行き、見込みフォロワーにアプローチする機能です。</p>
+                <div class="rm-warn"><strong>全機能デフォルトOFF。</strong> やりすぎるとBANリスクがあるため、必ず1日の上限を低めに設定してください。</div>
+
+                <h5>4つのアクション</h5>
+                <ul>
+                  <li><strong>いいね</strong> — 競合の投稿にいいね</li>
+                  <li><strong>コメント</strong> — AIが50文字以内の自然なコメントを生成して投稿</li>
+                  <li><strong>引用リポスト</strong> — AIが100文字以内の引用コメントを生成して投稿</li>
+                  <li><strong>返信いいね</strong> — 競合投稿のコメント欄にいいね（見込みフォロワー発見用）</li>
+                </ul>
+
+                <h5>安全対策</h5>
+                <ul>
+                  <li>1日の上限設定（デフォルト5アクション）</li>
+                  <li>各アクション間に3〜25秒のランダム待機</li>
+                  <li>ブラウザ操作（Playwright）で実行 — ログイン済みCookieが必要</li>
+                </ul>
+              </div>
+            </details>
+
+            <!-- リサーチの自動実行 -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#ecfdf5;color:#059669">6</span>
+                自動リサーチ — いつ・なぜ実行されるか
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>以下のいずれかの条件を満たすと、AIが自動でリサーチを実行します:</p>
+                <ul>
+                  <li>まだ1回もリサーチしたことがない</li>
+                  <li>前回のリサーチから7日以上経過（設定変更可能）</li>
+                  <li>有効なナレッジカードが3枚未満（材料不足）</li>
+                  <li>勝ちパターンカードが存在しない</li>
+                  <li>PDCA分析がネガティブな結果を検出した</li>
+                </ul>
+
+                <h5>リサーチの流れ</h5>
+                <div class="alc-flow">① DuckDuckGoで競合を検索
+② 各アカウントのバズ投稿を収集
+③ パターン分析 → ナレッジカード作成
+④ 勝ちパターン（最もバズった投稿）を特別分析 → 勝ちカード作成</div>
+
+                <div class="rm-tip">手動運用でも同じリサーチを手動実行できます。自律運用では上記条件を満たすと自動で実行されるのが違いです。</div>
+              </div>
+            </details>
+
+            <!-- 改善ループ -->
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fef3c7;color:#d97706">7</span>
+                改善ループ — カードスコアの自動更新（10分ごと）
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>PDCA分析とは別に、10分ごとにナレッジカードのスコアを実績ベースで更新する仕組みです。<strong>AIは使わないため費用はゼロです。</strong></p>
+
+                <h5>PDCA分析との違い</h5>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th></th><th>改善ループ</th><th>PDCA分析</th></tr></thead>
+                    <tbody>
+                      <tr><td>頻度</td><td>10分ごと</td><td>1日1回（指定時刻）</td></tr>
+                      <tr><td>AI呼び出し</td><td><strong>なし（DB計算のみ）</strong></td><td>あり（費用発生）</td></tr>
+                      <tr><td>やること</td><td>カードスコアの数値更新・低スコア引退</td><td>投稿内容の質を分析・新カード作成・ミックス比率調整</td></tr>
+                      <tr><td>成果物</td><td>スコアの変動のみ</td><td>成功/失敗パターンカード・分析テキスト</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                <h5>10分ごとにやっていること</h5>
+                <div class="alc-flow">① 過去30日の投稿（メトリクス付き）を収集
+② 各ナレッジカードで作った投稿の平均エンゲージメントを計算
+③ 結果をスコア（0〜100）に正規化してカードに反映
+④ スコア20未満のカードを自動無効化
+⑤ アクティブカードが30枚を超えたら低スコアから引退</div>
+
+                <h5>ログの見方（AIモニター）</h5>
+                <p>「改善ループ完了: 0枚のカードスコア更新, 10件分析」のようなログが表示されます。</p>
+                <ul>
+                  <li><strong>○件分析</strong> — メトリクス付きの投稿を何件見たか</li>
+                  <li><strong>○枚のカードスコア更新</strong> — 実際にスコアが変わったカードの枚数</li>
+                </ul>
+                <p>「0枚更新」でも異常ではありません。スコアを変えるほどの新しいデータがなかった、または最低投稿数（デフォルト3件）に満たないカードばかりだった場合です。</p>
+
+                <div class="rm-tip">改善ループはカードの「成績表」を定期更新しているだけです。投稿が増えてメトリクスが溜まるほど、スコアが正確になり、良いカードが選ばれやすくなります。</div>
+              </div>
+            </details>
+
+          </section>
+
+          <!-- ═══════ PART 4: 自律運用の画面ガイド ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">PART 4</p>
+                <h3>自律運用の画面ガイド</h3>
+              </div>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px">左メニューの「自律運用」セクションにある5つの画面の使い方です。</p>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#dbeafe;color:#2563eb">&#x1f465;</span>
+                アカウント選択 — 手動/自動の切替
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>登録済みアカウントの運用モードを手動⇔自動で切り替える画面です。</p>
+                <ul>
+                  <li>「自動に切替」→ そのアカウントの自律運用が開始される</li>
+                  <li>「手動に切替」→ 自律運用が停止し、手動運用に戻る</li>
+                </ul>
+                <p>切替はいつでも可能。自動→手動にしても、これまでの投稿やデータは消えません。</p>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#dcfce7;color:#16a34a">&#x1f4c8;</span>
+                運用ダッシュボード — 今日の投稿状況と統計
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>自動アカウントごとの今日の投稿数・目標達成率・直近の投稿一覧が表示されます。</p>
+                <ul>
+                  <li>目標に対する進捗がプログレスバーで見える</li>
+                  <li>各投稿のパフォーマンス（ビュー・いいね・返信）も表示</li>
+                </ul>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fef3c7;color:#d97706">&#x1f916;</span>
+                AIモニター — AIの行動ログをリアルタイム確認
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>AutoPlannerの全行動がログとして記録されます。「AIが何を考えて何をしたか」がわかる重要な画面です。</p>
+                <ul>
+                  <li>投稿生成・スキップの判断理由</li>
+                  <li>ナレッジカードの選択・PDCA分析の結果</li>
+                  <li>リサーチの実行状況</li>
+                  <li>エラーの詳細</li>
+                </ul>
+                <p>セーフモードON中は「AIが何を作ったか」をここで確認してから本番に切り替えましょう。</p>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#f3e8ff;color:#9333ea">&#x1f4cb;</span>
+                日次レポート — PDCA分析の履歴
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>毎日のPDCA分析結果の履歴が見られます。</p>
+                <ul>
+                  <li>AIの分析テキスト（何がうまくいって何が課題か）</li>
+                  <li>投稿目的ミックスの変化</li>
+                  <li>作成された成功/失敗パターンカード</li>
+                </ul>
+                <p>カードをクリックすると分析の全文が展開されます。</p>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">&#x2699;</span>
+                設定 — 自律運用のパラメータ調整
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>アカウントごとの自律運用パラメータを調整する画面です。</p>
+                <ul>
+                  <li>1日の投稿目標数</li>
+                  <li>投稿時間帯（開始・終了）</li>
+                  <li>最低投稿間隔</li>
+                  <li>PDCA分析時刻</li>
+                  <li>投稿目的ミックス比率</li>
+                  <li>競合エンゲージメント設定</li>
+                  <li>ディレクティブ管理</li>
+                </ul>
+              </div>
+            </details>
+
+          </section>
+
+          <!-- ═══════ PART 5: 全設定値リファレンス ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">PART 5</p>
+                <h3>全設定値リファレンス</h3>
+              </div>
+            </div>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#f1f5f9;color:#475569">&#x2699;</span>
+                アプリ全体の設定（設定画面で変更）
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>設定</th><th>既定値</th><th>意味</th></tr></thead>
+                    <tbody>
+                      <tr><td>スケジューラ有効</td><td>ON</td><td>全自動処理のマスタースイッチ。OFFにすると予約投稿・自動返信・自律運用すべて停止</td></tr>
+                      <tr><td>スケジューラ間隔</td><td>30秒</td><td>メインループの巡回頻度。短くするとレスポンス向上するがPC負荷も増加</td></tr>
+                      <tr><td>セーフモード</td><td>ON</td><td>ONなら投稿・返信せずシミュレーション記録のみ。テスト中は必ずON</td></tr>
+                      <tr><td>AutoPlanner間隔</td><td>300秒(5分)</td><td>投稿判断サイクルの頻度。短すぎるとAI呼び出しが増えて費用増</td></tr>
+                      <tr><td>改善ループ間隔</td><td>600秒(10分)</td><td>カードスコア更新の頻度。AI呼び出しは発生しない（DB計算のみ）</td></tr>
+                      <tr><td>PDCA分析</td><td>ON</td><td>毎日のAI分析の有効/無効。1回あたり約$0.03〜0.05のAI費用</td></tr>
+                      <tr><td>リサーチ間隔</td><td>7日</td><td>自動リサーチの最短間隔。短すぎるとAI費用が大きく増加</td></tr>
+                      <tr><td>AI予算上限</td><td>100回/日</td><td>1日のAI呼び出し上限。超過時は警告or自動停止（設定による）</td></tr>
+                      <tr><td>予算超過時の動作</td><td>警告のみ</td><td>「警告のみ」=ログに記録して継続 / 「自動停止」=AI呼び出しを停止</td></tr>
+                      <tr><td>データ保持日数</td><td>30日</td><td>古いログ・メトリクスの自動削除期間。0=無期限</td></tr>
+                      <tr><td>トークン更新余裕</td><td>24時間</td><td>Metaトークン期限切れの何時間前に自動更新するか</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#f1f5f9;color:#475569">&#x1f464;</span>
+                アカウントごとの設定
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>設定</th><th>既定値</th><th>意味</th></tr></thead>
+                    <tbody>
+                      <tr><td>発信ジャンル</td><td>（必須入力）</td><td>AIが投稿を作る際の方向性。具体的なほどAIの出力品質が上がる</td></tr>
+                      <tr><td>運用モード</td><td>手動</td><td>手動=自分で操作 / 自動=AIが全自動で投稿</td></tr>
+                      <tr><td>1日の投稿目標</td><td>3件</td><td>手動+自動+キューの合計目標</td></tr>
+                      <tr><td>投稿開始時刻</td><td>09:00</td><td>この時刻前は投稿しない（JST）</td></tr>
+                      <tr><td>投稿終了時刻</td><td>21:00</td><td>この時刻後は投稿しない（JST）</td></tr>
+                      <tr><td>最低投稿間隔</td><td>60分</td><td>前回投稿からこの時間は待つ</td></tr>
+                      <tr><td>PDCA分析時刻</td><td>9時</td><td>毎日この時刻に分析実行（JST）</td></tr>
+                      <tr><td>目的ミックス</td><td>教育25/交流25/共感20/ブランド15/エンタメ15</td><td>投稿目的の比率。PDCAで自動調整される</td></tr>
+                      <tr><td>競合エンゲージメント</td><td>全てOFF</td><td>いいね/コメント/引用/返信いいね個別ON/OFF</td></tr>
+                      <tr><td>エンゲージ上限</td><td>5回/日</td><td>1日の競合アクション上限。低めに設定してBAN回避</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </details>
+
+          </section>
+
+          <!-- ═══════ PART 6: カスタマイズ ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">PART 6</p>
+                <h3>AIでこのアプリを改修する方法</h3>
+              </div>
+            </div>
+            <p style="font-size:13px;color:var(--muted);margin-bottom:16px">このアプリ自体をAIに修正・機能追加してもらう方法です。プログラミング知識は不要です。</p>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#dbeafe;color:#2563eb">&#x1f6e0;</span>
+                Claude Code でアプリを改修する手順
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <h5>準備</h5>
+                <ol>
+                  <li>Claude Code がインストール済み＆ログイン済みであること（PART 0 ステップ2参照）</li>
+                  <li>コマンドプロンプトまたはターミナルを開く</li>
+                </ol>
+
+                <h5>手順</h5>
+                <ol>
+                  <li>ターミナルでアプリのフォルダに移動:
+                    <div class="alc-flow">cd C:\Users\あなた\パス\threads-control-center</div>
+                  </li>
+                  <li><code>claude</code> と打ってEnter → Claude Codeが起動する</li>
+                  <li>やりたいことを日本語で指示する。例:
+                    <ul>
+                      <li>「投稿の文字数上限を300文字に変更して」</li>
+                      <li>「ダッシュボードにアカウントごとの週次グラフを追加して」</li>
+                      <li>「自律運用で投稿時に画像も添付できるようにして」</li>
+                      <li>「○○のエラーが出るから直して」</li>
+                    </ul>
+                  </li>
+                  <li>Claude Code がファイルを読んで修正案を出すので、承認（y）する</li>
+                  <li>アプリを再起動して変更を確認</li>
+                </ol>
+
+                <div class="rm-warn"><strong>改修前にバックアップを取ってください。</strong><br>
+                アプリフォルダをまるごとコピーしておけば、失敗しても元に戻せます。<br>
+                特に <code>data/</code> フォルダ（データベース）は大事です。</div>
+
+                <h5>アプリの構成（知っておくと指示しやすい）</h5>
+                <ul>
+                  <li><code>app/main.py</code> — サーバーのメイン処理・APIルート</li>
+                  <li><code>app/auto_planner.py</code> — 自律運用の頭脳（4フェーズサイクル）</li>
+                  <li><code>app/pdca_engine.py</code> — PDCA日次分析</li>
+                  <li><code>app/static/index.html</code> — 全画面のHTML</li>
+                  <li><code>app/static/styles.css</code> — デザイン（CSS）</li>
+                  <li><code>app/static/js/</code> — 画面ごとのJavaScript</li>
+                  <li><code>data/</code> — SQLiteデータベース（投稿・アカウント・設定など全データ）</li>
+                </ul>
+
+                <div class="rm-tip">Claude Code は対話形式なので「これ違う」「もっとこうして」と何度でも指示し直せます。1回で完璧にならなくても大丈夫です。</div>
+              </div>
+            </details>
+          </section>
+
+          <!-- ═══════ PART 7: よくある質問 ═══════ -->
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">PART 7</p>
+                <h3>よくある質問（Q&A）</h3>
+              </div>
+            </div>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">Q</span>
+                アプリを閉じたらどうなる？
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p><strong>全ての自動処理が停止します。</strong>予約投稿・自律運用・自動返信はアプリが起動している間だけ動きます。PCのスリープ中も停止します。次回起動時に自動的に再開しますが、停止中に「投稿すべきだった分」を追いつきで投稿する機能はありません。</p>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">Q</span>
+                AIの費用はどのくらいかかる？
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>Claude Code の場合の目安:</p>
+                <ul>
+                  <li><strong>投稿1件の生成</strong>: 約$0.02〜0.05（約3〜8円）</li>
+                  <li><strong>PDCA分析1回</strong>: 約$0.03〜0.05（約5〜8円）</li>
+                  <li><strong>リサーチ1回</strong>: 約$0.10〜0.30（約15〜50円）※アカウント数による</li>
+                  <li><strong>1日3投稿+PDCA</strong>: 約$0.10〜0.20（約15〜30円/日）</li>
+                  <li><strong>1日15投稿+PDCA+リサーチ</strong>: 約$0.50〜1.00（約75〜150円/日）</li>
+                </ul>
+                <p>AI予算上限（デフォルト100回/日）で上限を設定できます。</p>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#dbeafe;color:#1d4ed8">Q</span>
+                Claude Code と Codex CLI、どちらを使えばいい？
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p><strong>どちらも同等に利用できます。</strong> 設定画面で「CLIを検出」したあと、テーブルの「動作確認」ボタンで PONG 応答を確認すれば本番運用可能です。</p>
+                <p>アカウントごとに使う CLI を切り替えたい場合は、アカウント編集の「優先AI CLI」で個別に指定できます。投稿生成・PDCA・リサーチの既定値がそのアカウントの設定に追従します。</p>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">Q</span>
+                セーフモードをOFFにするタイミングは？
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>以下を全て確認してからOFFにしてください:</p>
+                <ol>
+                  <li>AIモニターで数件分の生成投稿内容を確認し、品質に問題がないこと</li>
+                  <li>投稿の頻度・間隔が想定通りであること（連投していないか等）</li>
+                  <li>ナレッジカードが十分にあること（3枚以上）</li>
+                </ol>
+                <p>不安な場合は1週間ほどセーフモードで運用して、AIモニターのログを見てから判断してください。</p>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">Q</span>
+                localhostでOAuth認証できない（HTTPS必須エラー）
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>Meta（Threads API）はHTTPS必須のため、<code>http://localhost</code> ではOAuth認証できません。解決方法は2つ:</p>
+                <h5>方法1: GASブリッジ（推奨）</h5>
+                <p>Google Apps Script でHTTPSのエンドポイントを作り、ローカルアプリと連携します。設定画面の「GASブリッジ」セクションで設定。</p>
+                <h5>方法2: ngrok</h5>
+                <p>ngrok でローカルサーバーをHTTPS公開します。<code>ngrok http 8765</code> で取得したURLをMeta側のCallback URLとアカウントのRedirect URIに設定します。</p>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">Q</span>
+                データのバックアップと移行は？
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>全データは <code>data/threads_control_center.sqlite3</code> に保存されています。</p>
+                <ul>
+                  <li><strong>バックアップ</strong>: アプリを停止した状態で <code>data/</code> フォルダをコピーするだけ</li>
+                  <li><strong>移行</strong>: 新しいPCにアプリフォルダごとコピーすればそのまま動きます</li>
+                  <li><strong>復元</strong>: <code>data/</code> フォルダを差し替えてアプリを再起動</li>
+                </ul>
+                <div class="rm-warn"><strong>アプリ起動中にdataフォルダをコピーするとデータ破損の可能性があります。</strong>バックアップ時は必ずアプリを停止してください。</div>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">Q</span>
+                自律運用で目標数に達しない
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p>考えられる原因と対処:</p>
+                <ul>
+                  <li><strong>時間帯と間隔の制約</strong> — 12時間で60分間隔なら最大12件。目標を下げるか間隔を短くする</li>
+                  <li><strong>遅い時間に起動</strong> — 18:00起動で21:00終了なら3時間で最大3件。追いつき機能はない</li>
+                  <li><strong>AI予算上限に到達</strong> — AIモニターで「budget」系のログを確認。上限を上げるか不要なAI呼び出しを減らす</li>
+                  <li><strong>ナレッジカード不足</strong> — 有効なカードが0枚だと投稿を作れない。リサーチを実行してカードを増やす</li>
+                  <li><strong>AI生成エラー</strong> — AIモニターでエラーログを確認。CLI認証切れやAPI上限の可能性</li>
+                </ul>
+              </div>
+            </details>
+
+            <details class="ai-logic-card">
+              <summary>
+                <span class="alc-icon" style="background:#fee2e2;color:#dc2626">Q</span>
+                複数アカウントを同時に自律運用できる？
+                <span class="alc-arrow">▼</span>
+              </summary>
+              <div class="alc-body">
+                <p><strong>はい、可能です。</strong>アカウントごとに手動/自動を個別に設定できます。</p>
+                <ul>
+                  <li>各アカウントが独立して5分サイクルを回す</li>
+                  <li>投稿目標・時間帯・ミックス比率はアカウントごとに別設定</li>
+                  <li>PDCA分析ではアカウント間のクロス学習（Aで成功した戦略をBに参考カードとして共有）も自動で行われる</li>
+                </ul>
+                <div class="rm-warn"><strong>アカウント数 × 投稿数 でAI呼び出しが増えます。</strong><br>
+                5アカウント×5投稿/日 = 25回以上のAI呼び出し。AI予算上限を確認してください。</div>
+              </div>
+            </details>
+
+          </section>
+
+        </section>
+
+        <section id="settingsScreen" class="screen">
+          <section class="screen-stack">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">設定</p>
+                  <h3>1. 起動と自動化の既定値を決める</h3>
+                </div>
+              </div>
+              <form id="settingsForm" class="form-grid">
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">サーバー</h4>
+                  <p class="settings-group-desc">このアプリ自体が立ち上げるローカルサーバーの設定です。<br>通常は変更不要です。<br>ポートが他のアプリと競合する場合だけ変更し、変更後は <strong>アプリを再起動</strong> してください。</p>
+                  <div class="settings-group-fields form-grid">
+                    <label>ホスト<small>接続を受け付けるIPアドレス。自分のPCだけでアクセスするなら 127.0.0.1 のまま</small><input name="host" type="text" placeholder="127.0.0.1" /></label>
+                    <label>ポート<small>ブラウザでアクセスする番号。http://127.0.0.1:<strong>8765</strong>/ の太字部分</small><input name="port" type="number" placeholder="8765" /></label>
+                  </div>
+                </div>
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">スケジューラ（バックグラウンド自動実行）</h4>
+                  <p class="settings-group-desc">ONにすると、アプリが裏で定期的に以下を自動処理します。<br>・予約投稿の実行<br>・Threads アクセストークンの期限が近づいたら自動更新<br>・GASブリッジが有効な場合、GAS からのイベント取り込み<br>PCが起動してアプリが開いている間だけ動きます。</p>
+                  <div class="settings-group-fields">
+                    <label class="toggle"><input name="scheduler_enabled" type="checkbox" /><span>バックグラウンドスケジューラを有効にする</span></label>
+                    <label>間隔（秒）<small>何秒ごとに上記の自動処理を実行するか。初期値 30 秒で問題なし</small><input name="scheduler_interval_seconds" type="number" placeholder="30" /></label>
+                    <label>トークン更新余裕時間（時間）<small>Meta の長期トークンは60日で期限切れになる。切れると投稿できなくなる。<br>これは「期限の何時間前に自動更新するか」の設定。<br>24 なら期限の24時間前に更新。アプリが開いていないと更新されないため、長期間閉じる予定があるなら 48〜72 に増やすと安全</small><input name="token_refresh_margin_hours" type="number" placeholder="24" /></label>
+                    <label>データ保存日数<small>以下のデータを何日間保持するか。スケジューラが定期的に古いものを削除します。<br>・返信イベントのログ（返信ルールが発動した記録）<br>・指標スナップショット（ダッシュボードのフォロワー推移グラフ・投稿インサイト履歴）<br>⚠️ この日数を超えたメトリクスはダッシュボードのグラフや投稿一覧から消えます。長期推移を見たい場合は大きめの値か 0（無期限）を推奨。<br>返信ルール自体・投稿・アカウント情報は削除されません。</small><input name="retention_days" type="number" placeholder="30" /></label>
+                  </div>
+                </div>
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">セーフモード</h4>
+                  <p class="settings-group-desc">投稿・返信の安全弁です。テスト中は ON 推奨。</p>
+                  <div class="settings-group-fields form-grid">
+                    <label class="wide toggle"><input name="safe_mode" type="checkbox" /><span>セーフモード<br><small>ONにすると、投稿・返信の API を実際には叩かず「シミュレーション実行」としてログに残すだけにします。<br>誤って本番投稿しないための安全弁です。</small></span></label>
+                  </div>
+                </div>
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">AI連携（投稿本文の自動生成）</h4>
+                  <p class="settings-group-desc">「投稿」タブで「AI生成」を実行すると、Claude Code などの CLI がこのフォルダを起点にナレッジカードや人格設定ファイルを読み込む。<br>フォルダを移動していなければ変更不要</p>
+                  <div class="settings-group-fields form-grid">
+                    <label class="wide">ワークスペースルート
+                      <small>
+                        AIクローン工場（AIアシスタントの参照ディレクトリ）の場所。Windows例: <code>D:\01.AI\oz_workspace</code> / Linux/macOS例: <code>/home/iwasaki/work/oz_workspace</code><br>
+                        指定パスが現環境に存在しない場合はアプリのルートに自動フォールバックします（保存後に下に表示）。
+                      </small>
+                      <input name="workspace_root" type="text" placeholder="例: /home/USER/work/oz_workspace" />
+                      <div id="workspaceRootStatus" style="font-size:11px;margin-top:4px"></div>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">公開URL（メディア配信・外部連携）</h4>
+                  <p class="settings-group-desc">このアプリを外部に公開する際のベースURLです。メディアURL生成（画像・動画の配信）、OAuthコールバック、Webhook受信などに使われます。<br>ローカル環境を公開するには ngrok などのトンネルが必要です。<br>GASブリッジ経由のみで運用する場合は空で構いません。</p>
+                  <div class="settings-group-fields form-grid">
+                    <label class="wide">公開ベースURL<small>外部からアクセスできるこのアプリの公開URL（例: https://xxxx.ngrok.app）。メディア配信・外部連携に使用</small><input name="public_base_url" type="text" placeholder="https://example.ngrok.app" /></label>
+                  </div>
+                </div>
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">メディア（画像・動画）投稿 <span class="status-pill pill-warn" style="font-size:11px;vertical-align:middle">実装予定</span></h4>
+                  <p class="settings-group-desc">画像・動画を含む投稿は現在準備中です。今後のアップデートで対応予定です。<br>現時点では、公開済みの画像・動画 URL をジョブの本文に直接記載する方法で投稿できます。</p>
+                </div>
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">GASブリッジ</h4>
+                  <p class="settings-group-desc">Meta からの callback を Google Apps Script（GAS）で受け取り、このアプリが後から取り込む仕組みです。<br>ngrok 不要でローカルアプリを使えるのが利点です。<br>GASブリッジを使わない場合はすべて空でOKです。</p>
+                  <div class="settings-group-fields form-grid">
+                    <label class="wide toggle"><input name="gas_bridge_enabled" type="checkbox" /><span>GASブリッジを有効にする（ONにするとスケジューラが定期的に GAS からイベントを取り込む）</span></label>
+                    <label class="wide">GAS WebアプリURL<small>GASをWebアプリとしてデプロイしたときの exec URL</small><input name="gas_bridge_base_url" type="text" placeholder="https://script.google.com/macros/s/xxxxx/exec" /></label>
+                    <label class="wide">GAS共有キー<small>GASのスクリプトプロパティ BRIDGE_API_KEY に設定したのと同じ値</small><input name="gas_bridge_api_key" type="password" placeholder="GASとローカルで同じ値を設定" /></label>
+                    <label>GAS同期件数<small>1回の同期で取り込む最大イベント件数。<br>通常は 20 のままでOK</small><input name="gas_bridge_poll_limit" type="number" placeholder="20" /></label>
+                    <label>GASタイムアウト（秒）<small>GASへの通信が何秒で失敗扱いになるか。<br>通常は 20 のままでOK</small><input name="gas_bridge_timeout_seconds" type="number" placeholder="20" /></label>
+                  </div>
+                </div>
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">自動返信ポーリング</h4>
+                  <p class="settings-group-desc">返信ルールで自動返信する際のリプライ取得方式を切り替えます。<br>通常（OFF）は自分の投稿への直接リプライのみ検知します。ONにするとスレッド全体を見て、ネストされた返信にも反応します。</p>
+                  <div class="settings-group-fields">
+                    <label class="wide toggle"><input name="reply_use_conversation" type="checkbox" /><span>会話ツリー全体をポーリング（conversation API）<br><small>ONにすると返信の返信（ネストされたリプライ）も検知します。自分の発言への返信のみ処理し、他人同士の会話には反応しません。<br>OFFだと従来通り直接の子リプライのみ検知します。</small></span></label>
+                  </div>
+                </div>
+
+
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">テーマ</h4>
+                  <p class="settings-group-desc">画面の配色テーマを選択します。</p>
+                  <div class="settings-group-fields form-grid">
+                    <label>テーマ<small>画面の配色テーマを選択します。変更後は「設定を保存」を押してください</small>
+                      <select name="theme">
+                        <option value="default">デフォルト（ライトブルー）</option>
+                        <option value="tech">Tech（ダーク / ターミナル）</option>
+                        <option value="cyberpunk">Cyberpunk（ネオン / 電脳）</option>
+                        <option value="neon">Neon（ネイビー / 近未来SaaS）</option>
+                        <option value="black">ブラック（ミニマル / 漆黒）</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="wide form-actions"><button type="submit" class="primary-button">設定を保存</button></div>
+              </form>
+            </article>
+
+            <article class="panel">
+                <div class="panel-header">
+                  <div>
+                    <p class="eyebrow">GASブリッジ</p>
+                    <h3>2. GAS から受け取ったイベントを同期する</h3>
+                  </div>
+                </div>
+                <div class="callout info">
+                  <h4>GASブリッジとは</h4>
+                  <p>Meta からの callback を Google Apps Script（GAS）で受けて保存し、このアプリが後から取り込む仕組みです。</p>
+                  <p>注意: Apps Script では request headers を取れないため、Meta webhook の署名検証を厳密にやりたい場合は webhook だけ別のサーバーやトンネル側に残すほうが安全です。</p>
+                </div>
+                <div class="callout warning">
+                  <h4>GAS URLとキーを設定したら、必ず疎通テストを押してください</h4>
+                  <p>疎通テストは接続確認のみで、データには一切触りません。<br>
+                  「疎通OK」が返ってきてはじめて、GASブリッジが正しく動いていると確認できます。</p>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:8px;margin-top:12px">
+                  <button id="gasHealthButton" class="primary-button" style="align-self:flex-start">疎通テスト</button>
+                  <p class="muted" style="font-size:12px">「今すぐ同期」はスケジューラが自動で約30秒ごとに処理します。<br>
+                  Threads にリプライが来たのに30秒待てない場合や、スケジューラをOFFにして手動運用したい場合だけ下を押してください。</p>
+                  <button id="syncGasBridgeButton" class="ghost-button" style="align-self:flex-start">今すぐ GAS を同期する（スケジューラを待ちたくない場合のみ）</button>
+                </div>
+                <div id="gasBridgeStatus" class="table-wrap" style="margin-top:12px"></div>
+              </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">確認</p>
+                  <h3>3. 利用できるCLIを確認する</h3>
+                </div>
+                <button id="detectCliButton" class="primary-button">CLIを検出</button>
+              </div>
+              <div class="callout info">
+                <p>AI で投稿本文を生成するには、以下のいずれかの CLI が PC にインストールされている必要があります。<br>
+                右上の「CLIを検出」を押すと自動でパスを探します。<strong>未検出</strong>の場合は下の手順でインストールしてください。</p>
+              </div>
+
+              <div class="subsection">
+                <div class="subsection-header">
+                  <h4>ターミナルの開き方</h4>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>OS</th><th>手順</th></tr></thead>
+                    <tbody>
+                      <tr><td><strong>Windows</strong></td><td>スタートメニューを開いて「Terminal」または「PowerShell」と検索して起動</td></tr>
+                      <tr><td><strong>Mac</strong></td><td>Spotlight（Command + Space）を開いて「ターミナル」と入力して起動</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <div class="subsection">
+                <div class="subsection-header">
+                  <h4>各CLIのインストール</h4>
+                  <p class="muted">どちらも Node.js が必要です。インストール済みでない場合は先に nodejs.org からインストールしてください。</p>
+                </div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>CLI</th><th>ターミナルに貼るコマンド</th><th>ログインコマンド</th><th>公式ドキュメント</th></tr></thead>
+                    <tbody>
+                      <tr>
+                        <td><strong>Claude Code</strong></td>
+                        <td><code>npm install -g @anthropic-ai/claude-code</code></td>
+                        <td><code>claude</code></td>
+                        <td><a href="https://code.claude.com/docs/ja/overview#terminal" target="_blank" rel="noreferrer">ドキュメント →</a></td>
+                      </tr>
+                      <tr>
+                        <td><strong>Codex CLI</strong></td>
+                        <td><code>npm install -g @openai/codex</code></td>
+                        <td><code>codex</code></td>
+                        <td><a href="https://developers.openai.com/codex/cli" target="_blank" rel="noreferrer">ドキュメント →</a></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="muted" style="margin-top:8px;font-size:12px">インストール後にログインコマンドを実行してアカウント認証を済ませ、「CLIを検出」を押し直してください。AI生成を使わない場合はどれも不要です。</p>
+              </div>
+
+              <div id="cliStatus" class="table-wrap"></div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">確認</p>
+                  <h3>4. スクレイピング機能（競合リサーチ）を確認する</h3>
+                </div>
+              </div>
+
+              <div class="callout info" style="margin-bottom:16px">
+                <p>競合リサーチには以下の検索方法が利用できます。</p>
+                <p style="margin-top:4px"><strong>Threads内キーワード検索（Playwright）</strong> — 「選択したキーワードでThreads検索」ボタンで使用。Threads内の実際の投稿をスクレイピングで収集します。</p>
+              </div>
+
+              <!-- Playwright Setup -->
+              <div class="subsection">
+                <div class="subsection-header" style="display:flex;justify-content:space-between;align-items:flex-start">
+                  <div>
+                    <h4>Threads内キーワード検索のセットアップ</h4>
+                    <p class="muted">Playwrightを使ってThreads内の実際の投稿をスクレイピングします。</p>
+                  </div>
+                  <button id="detectPlaywrightButton" class="primary-button" style="white-space:nowrap;margin-left:12px">Playwright を検出</button>
+                </div>
+                <div id="playwrightStatus" class="table-wrap" style="margin-bottom:16px"></div>
+                <div class="table-wrap">
+                  <table>
+                    <thead><tr><th>手順</th><th>ターミナルに貼るコマンド</th><th>説明</th></tr></thead>
+                    <tbody>
+                      <tr>
+                        <td>①</td>
+                        <td><code>pip install playwright</code></td>
+                        <td>Playwright Python パッケージのインストール</td>
+                      </tr>
+                      <tr>
+                        <td>②</td>
+                        <td><code>playwright install chromium</code></td>
+                        <td>Chromium ブラウザ本体のインストール（約150MB）</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p class="muted" style="margin-top:8px;font-size:12px">インストール後に「Playwright を検出」を押して状態を更新してください。その後、アカウント設定の「Threads ブラウザログイン」でログインセッションを保存すれば競合リサーチが使えます。</p>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">データ管理</p>
+                  <h3>5. データ使用量と削除</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">DBファイルやログデータの使用量を確認し、不要なデータを選択して削除できます。</p>
+              <div id="dataUsageSummary" style="margin-bottom:12px">
+                <button type="button" class="ghost-button" id="refreshDataUsageButton" onclick="loadDataUsage()">データ使用量を取得</button>
+              </div>
+              <div id="dataUsagePanel" style="display:none">
+                <div id="dataUsageTotalBar" style="margin-bottom:12px;padding:10px;background:var(--bg-2,#f8f9fa);border-radius:6px;font-size:13px"></div>
+                <table style="font-size:13px;width:100%;border-collapse:collapse">
+                  <thead>
+                    <tr>
+                      <th style="text-align:left;padding:8px">データ種別</th>
+                      <th style="text-align:right;padding:8px">件数</th>
+                      <th style="text-align:left;padding:8px">説明</th>
+                    </tr>
+                  </thead>
+                  <tbody id="dataUsageTableBody"></tbody>
+                </table>
+                <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+                  <button type="button" class="danger-button" id="deleteSelectedDataButton" onclick="deleteSelectedData()" disabled>選択したデータを削除</button>
+                  <span id="dataDeleteStatus" class="muted" style="font-size:12px"></span>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">初期化</p>
+                  <h3>6. 設定・データをリセットする</h3>
+                </div>
+              </div>
+              <div class="callout warning">
+                <h4>削除されるのは <code>data/threads_control_center.sqlite3</code> 内のレコードだけです</h4>
+                <p>ワークスペース内のファイルは一切削除されません。<br>操作は取り消せません。確認ダイアログをよく読んでから実行してください。</p>
+              </div>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">
+                <button id="resetSettingsButton" class="ghost-button">設定を初期値に戻す</button>
+                <button id="resetAccountsButton" class="ghost-button">アカウントをすべて削除する</button>
+                <button id="resetAllButton" class="danger-button">完全初期化（全データ削除）</button>
+              </div>
+            </article>
+            </section>
+          </section>
+
+        <section id="accountsScreen" class="screen">
+          <div class="accounts-layout">
+          <section class="screen-stack">
+
+            <!-- Panel 1: 必須情報の入力 -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">ステップ 1</p>
+                  <h3>アカウント情報と Threads API 設定を入力して保存する</h3>
+                </div>
+              </div>
+              <div id="accountEditorBanner" class="hidden"></div>
+              <form id="accountForm" class="form-grid">
+                <input name="id" type="hidden" />
+
+                <!-- 基本情報 -->
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">基本情報</h4>
+                  <p class="settings-group-desc">このアプリ内でアカウントを識別するための情報です。</p>
+                  <div class="settings-group-fields form-grid">
+                    <label>表示名<small>アプリ内での区別用。「本垢」「副業用」など自分でわかる名前</small><input name="name" type="text" placeholder="本垢" /></label>
+                    <label>ユーザー名<small>Threads の @ なしのハンドル</small><input name="username" type="text" placeholder="your_handle" /></label>
+                    <label>発信ジャンル<small>何を発信するアカウントか。AIがコンテンツ生成時に参照する</small><input name="content_genre" type="text" placeholder="AIツール、副業、デザイン..." /></label>
+                    <label>優先AI CLI<small>このアカウントの投稿生成・PDCA・リサーチで既定で使う CLI。各フォームの CLI 選択の初期値になります。空欄なら全体既定（claude）</small>
+                      <select name="preferred_cli" id="accountPreferredCli">
+                        <option value="">（全体既定を使う）</option>
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- キャラ・ターゲット設定 -->
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">キャラ・ターゲット設定</h4>
+                  <p class="settings-group-desc">このアカウントの人格（UNIT）とターゲット層を設定します。投稿生成時にAIが参照します。</p>
+                  <div class="settings-group-fields form-grid">
+                    <label class="wide">キャラクター（UNIT）ディレクトリ名<small>ワークスペースの 20_UNITS/ 配下のディレクトリ名を入力（例: 01_oz）</small><input name="unit_dir_name" type="text" placeholder="01_oz" /></label>
+                    <label class="wide">発信のターゲット<small>誰に向けて発信するか。AI生成の文体・内容に影響する。詳しく書くほど精度が上がる</small>
+                      <textarea name="target_audience" rows="6" placeholder="例: 30〜40代の専業主婦・パート主婦。子育て中で外に働きに出づらく「自分だけ社会から取り残されてる」という焦燥感を抱えている。ブランクがあるため再就職にも自信がない。月3〜5万円でも自力で稼げたら人生が変わると思っている。" style="width:100%;box-sizing:border-box;resize:vertical"></textarea>
+                    </label>
+                  </div>
+                </div>
+
+                <!-- Threads API 設定 -->
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">Threads API 設定</h4>
+                  <p class="settings-group-desc">Meta for Developers で作成した Threads API アプリの情報を入力します。<br>App ID と App Secret は Meta Developer Console →「マイアプリ」→「アプリの設定」→「ベーシック」で確認できます。</p>
+                  <div class="callout info" style="margin-bottom:12px">
+                    <h4>Redirect URI は GAS の URL を使うと ngrok 不要です（推奨）</h4>
+                    <p>GASブリッジを設定済みの場合は、下の「Meta に登録する URL」の Redirect Callback URL をコピーしてここに貼ってください。<br>
+                    ngrok 等を使う場合は <code>https://xxxx.ngrok.app/callback</code> を入力してください。</p>
+                  </div>
+                  <div class="settings-group-fields form-grid">
+                    <label>Threads App ID<small>Meta Developer Console の Threads API 用 App ID</small><input name="client_id" type="text" /></label>
+                    <label>Threads App Secret<small>同上の App Secret</small><input name="client_secret" type="password" /></label>
+                    <label class="wide">Redirect URI<small>OAuth 後に Meta がリダイレクトしてくる URL。Meta Developer Console に登録する URL と必ず一致させる</small><input name="redirect_uri" type="text" placeholder="https://script.google.com/macros/s/xxx/exec?action=oauth_callback" /></label>
+                  </div>
+                </div>
+
+                <!-- OAuth スコープ -->
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">OAuth スコープ</h4>
+                  <p class="settings-group-desc">Meta Developer Console の「アクセス許可とフィーチャー」で承認済みのものだけチェックしてください。<br>未承認のスコープを含めたまま OAuth すると認証エラーになります。通常はすべてチェックしたまま進めて問題ありません。</p>
+                  <div id="scopeCheckboxes" style="display:flex;flex-wrap:wrap;gap:8px 20px;margin-top:8px">
+                    <label class="checkbox-label"><input type="checkbox" name="scope_threads_basic" checked> threads_basic</label>
+                    <label class="checkbox-label"><input type="checkbox" name="scope_threads_content_publish" checked> threads_content_publish</label>
+                    <label class="checkbox-label"><input type="checkbox" name="scope_threads_keyword_search" checked> threads_keyword_search</label>
+                    <label class="checkbox-label"><input type="checkbox" name="scope_threads_manage_insights" checked> threads_manage_insights</label>
+                    <label class="checkbox-label"><input type="checkbox" name="scope_threads_manage_mentions" checked> threads_manage_mentions</label>
+                    <label class="checkbox-label"><input type="checkbox" name="scope_threads_manage_replies" checked> threads_manage_replies</label>
+                    <label class="checkbox-label"><input type="checkbox" name="scope_threads_profile_discovery" checked> threads_profile_discovery</label>
+                    <label class="checkbox-label"><input type="checkbox" name="scope_threads_read_replies" checked> threads_read_replies</label>
+                  </div>
+                </div>
+
+                <!-- Meta 登録 URL -->
+                <div class="wide">
+                  <div class="subsection-header">
+                    <h4>Meta に登録する URL</h4>
+                    <p class="muted">保存後にここに表示される URL を Meta Developer Console に登録してください。</p>
+                  </div>
+                  <div id="accountIntegrationGuide"></div>
+                </div>
+
+                <!-- Webhook 設定 -->
+                <div class="wide settings-group">
+                  <h4 class="settings-group-heading">Webhook 設定 ― リプライ自動受信</h4>
+                  <p class="settings-group-desc">投稿にリプライが来たとき Meta からリアルタイムで通知を受け取れます。<br>
+                  Meta 開発者ダッシュボード → Webhooks → Threads で以下の2つを登録してください。</p>
+
+                  <div id="webhookGasBridgeInfo" style="margin-top:12px">
+                    <table class="mini-table" style="width:100%;border-collapse:collapse;font-size:0.9rem">
+                      <thead>
+                        <tr style="text-align:left;border-bottom:2px solid #dbe3f0">
+                          <th style="padding:8px 12px;width:35%">Meta 側の項目名</th>
+                          <th style="padding:8px 12px">ここの値をコピーして貼り付ける</th>
+                          <th style="padding:8px 4px;width:60px"></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr style="border-bottom:1px solid #eee">
+                          <td style="padding:8px 12px;font-weight:600">コールバック URL</td>
+                          <td style="padding:8px 12px"><input id="webhookCallbackUrl" type="text" readonly style="width:100%;background:#f5f7fb;border:1px solid #dbe3f0;border-radius:6px;padding:6px 10px;font-size:0.85rem" /></td>
+                          <td style="padding:8px 4px"><button type="button" class="btn-sm" onclick="copyWebhookField('webhookCallbackUrl')">コピー</button></td>
+                        </tr>
+                        <tr style="border-bottom:1px solid #eee">
+                          <td style="padding:8px 12px;font-weight:600">確認トークン</td>
+                          <td style="padding:8px 12px">
+                            <div style="display:flex;gap:6px">
+                              <input id="webhookVerifyTokenDisplay" type="text" readonly style="flex:1;background:#f5f7fb;border:1px solid #dbe3f0;border-radius:6px;padding:6px 10px;font-size:0.85rem" />
+                              <button type="button" class="btn-sm" onclick="regenerateVerifyToken()" title="新しいトークンを生成">再生成</button>
+                            </div>
+                          </td>
+                          <td style="padding:8px 4px"><button type="button" class="btn-sm" onclick="copyWebhookField('webhookVerifyTokenDisplay')">コピー</button></td>
+                        </tr>
+                      </tbody>
+                    </table>
+                    <p id="webhookGasNote" class="settings-group-desc" style="margin-top:8px;color:#888"></p>
+
+                    <div style="margin-top:12px;padding:12px;background:#f8f9fc;border:1px solid #dbe3f0;border-radius:8px">
+                      <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+                        <button type="button" class="ghost-button" id="webhookTestBtn" onclick="testWebhookFlow()" style="white-space:nowrap">Webhook テスト送信</button>
+                        <span style="font-size:0.82rem;color:#666">GAS にテスト用のリプライイベントを送信 → 同期 → 結果を確認します</span>
+                      </div>
+                      <div id="webhookTestResult" style="margin-top:8px;display:none"></div>
+                    </div>
+                  </div>
+
+                  <input name="webhook_verify_token" type="hidden" />
+                  <input name="webhook_secret" type="hidden" />
+                </div>
+
+                <!-- トークン情報（折りたたみ） -->
+                <div class="wide settings-group">
+                  <details>
+                    <summary class="settings-group-heading" style="cursor:pointer;list-style:none">▶ トークン情報（OAuth 後に自動入力・通常は編集不要）</summary>
+                    <p class="settings-group-desc" style="margin-top:8px">OAuth が完了すると自動でここに保存されます。手動で変更する必要はありません。</p>
+                    <div class="settings-group-fields form-grid" style="margin-top:12px">
+                      <label class="wide">Threads User ID<small>OAuth後に自動取得されます</small><input name="threads_user_id" type="text" placeholder="自動入力" /></label>
+                      <label class="wide">短期トークン<small>OAuth直後に一時的に発行されるトークン。通常は自動で長期トークンに変換されます</small><input name="short_lived_token" type="text" /></label>
+                      <label class="wide">長期トークン<small>実際の投稿・取得に使うトークン。60日で期限切れ。スケジューラが自動更新します</small><input name="long_lived_token" type="text" /></label>
+                    </div>
+                  </details>
+                </div>
+
+                <!-- 保存ボタン -->
+                <div class="wide form-actions" style="margin-top:16px">
+                  <button type="submit" class="primary-button">アカウントを保存</button>
+                </div>
+
+              </form>
+            </article>
+
+            <!-- Panel 2: OAuth認証 -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">ステップ 2</p>
+                  <h3>Threads アカウントと OAuth 認証する</h3>
+                </div>
+              </div>
+              <div class="callout warning">
+                <h4>ステップ 1 を保存してから行ってください</h4>
+                <p>App ID・App Secret・Redirect URI が保存済みでないと OAuth は始まりません。</p>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:16px;margin-top:16px">
+
+                <!-- OAuth URLを開く -->
+                <div>
+                  <button type="button" id="openOauthButton" class="primary-button" style="align-self:flex-start">OAuth URLを開く</button>
+                  <p class="muted" style="font-size:12px;margin-top:6px">
+                    ブラウザで Threads の認証画面が開きます。「許可する」を押してください。<br>
+                    <strong>GAS 経由の場合：</strong>許可後に「Threads OAuth を受け付けました」と表示されたら、設定画面の「今すぐ GAS を同期する」を押すとトークンが自動取得されます。<br>
+                    <strong>ngrok 経由の場合：</strong>許可後に自動でトークンが取得されます。
+                  </p>
+                </div>
+
+                <!-- サブボタン群 -->
+                <div class="settings-group" style="padding:12px 16px">
+                  <p style="font-size:12px;font-weight:600;margin-bottom:10px;color:var(--muted)">通常は使わないボタン（トラブル時・メンテ時のみ）</p>
+
+                  <div style="display:flex;flex-direction:column;gap:12px">
+
+                    <div>
+                      <button type="button" id="exchangeCodeButton" class="ghost-button">認証コードを手動で交換する</button>
+                      <p class="muted" style="font-size:11px;margin-top:4px">GAS 同期してもトークンが取れなかった場合に使います。Meta から届いた認証コードを貼り付けてトークンに変換します。正常に OAuth できていれば不要です。</p>
+                    </div>
+
+                    <div>
+                      <button type="button" id="refreshTokenButton" class="ghost-button">トークンを手動更新する</button>
+                      <p class="muted" style="font-size:11px;margin-top:4px">長期トークンは更新するたびに有効期限が 60日延びます（使い続ける限り実質無期限）。スケジューラが動いていれば期限切れ前に自動延長するので通常は不要です。スケジューラを長期間止めていた場合のみ使ってください。取得直後の 24時間はブロックされます。</p>
+                    </div>
+
+                    <div>
+                      <div style="display:flex;gap:8px;flex-wrap:wrap">
+                        <button type="button" id="refreshMetricsDiffButton" class="ghost-button">差分取得</button>
+                        <button type="button" id="refreshMetricsFullButton" class="ghost-button">全件取得</button>
+                      </div>
+                      <p class="muted" style="font-size:11px;margin-top:4px">「差分取得」は前回以降の新着のみ更新します。「全件取得」は全投稿を取り直すため投稿数が多いと時間がかかります。</p>
+                    </div>
+
+                  </div>
+                </div>
+
+              </div>
+            </article>
+
+            <!-- Panel 3: テスト投稿 -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">ステップ 3</p>
+                  <h3>テスト投稿で API 接続を確認する</h3>
+                </div>
+                <button class="primary-button" onclick="window.runAllTests(this)">全テスト実行</button>
+              </div>
+
+              <div class="callout warning" style="margin-bottom:12px">
+                <h4>OAuth 完了後に実行してください</h4>
+                <p>長期トークンが取得済みでないとテスト投稿は失敗します。<strong>実際に Threads へ投稿されます。</strong></p>
+              </div>
+
+              <!-- 実行内容一覧 -->
+              <div class="summary-strip" style="grid-template-columns:repeat(4,minmax(0,1fr));margin-bottom:16px">
+                <div class="summary-card">
+                  <p>① テキスト</p>
+                  <strong style="font-size:14px">「テスト」固定</strong>
+                </div>
+                <div class="summary-card">
+                  <p>② ツリー</p>
+                  <strong style="font-size:14px">3投稿リプライ連鎖</strong>
+                </div>
+                <div class="summary-card">
+                  <p>③ 画像</p>
+                  <strong style="font-size:14px" id="testImageStatus">公開URL設定待ち</strong>
+                </div>
+                <div class="summary-card">
+                  <p>④ 動画</p>
+                  <strong style="font-size:14px" id="testVideoStatus">公開URL設定待ち</strong>
+                </div>
+              </div>
+
+              <div class="callout info">
+                <h4>画像・動画テストについて</h4>
+                <p>Threads API は<strong>公開 HTTPS URL</strong> からしかメディアを取得できません。ローカルファイルの直接アップロードは非対応です。<br>
+                設定画面の「Webhook ベース URL」（ngrok 等のアプリ公開URL）を設定すると、<code>static/logo.png</code> と <code>static/テスト動画.mp4</code> を自動的に使います。<br>
+                未設定の場合は①②のみ実行し、③④はスキップします。</p>
+              </div>
+
+              <div class="callout warning" style="margin-top:12px">
+                <h4>メディア（画像・動画）投稿 <span class="status-pill pill-warn" style="font-size:11px;vertical-align:middle">実装予定</span></h4>
+                <p>画像・動画ファイルのアップロード機能は現在準備中です。今後のアップデートで対応予定です。<br>
+                現時点では、公開済みの画像・動画 URL をジョブの本文に直接記載する方法で投稿できます。</p>
+              </div>
+
+              <!-- 結果表示 -->
+              <div id="testPostResult" style="margin-top:16px"></div>
+            </article>
+
+          </section>
+
+          <!-- 右カラム: 保存済みアカウント一覧 -->
+          <article class="panel accounts-list-panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">確認</p>
+                <h3>保存済みアカウント</h3>
+              </div>
+            </div>
+            <div id="accountsTable" class="table-wrap"></div>
+          </article>
+
+          </div><!-- /.accounts-layout -->
+        </section>
+
+        <section id="researchScreen" class="screen">
+          <section class="screen-stack">
+
+            <!-- ③ 常時表示: 分析一覧 -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">履歴</p>
+                  <h3>分析一覧</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:10px">行をクリックすると下のフォームに設定が読み込まれます。再実行・内容確認はフォームから行ってください。</p>
+              <div id="researchProjectsTable" class="table-wrap"></div>
+            </article>
+
+            <!-- ①② タブで分析種別を選択して実行 -->
+            <article class="panel" id="researchFormPanel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">実行</p>
+                  <h3>新しい分析を実行する</h3>
+                </div>
+                <button class="ghost-button" onclick="newResearch()" style="font-size:12px">クリア</button>
+              </div>
+
+              <!-- タブ: ① 自社 / ② 競合WEB -->
+              <div class="modal-tabs" style="margin-bottom:0">
+                <button class="modal-tab active" id="tabOwnBtn" onclick="switchResearchTab('own')">📊 ① 自社アカウント分析</button>
+                <button class="modal-tab" id="tabCompetitorBtn" onclick="switchResearchTab('competitor')">🔍 ② WEBリサーチ（競合）</button>
+              </div>
+
+              <div id="researchTypeDesc" class="callout info" style="font-size:12px;margin:12px 0 16px">
+                ダッシュボードのメトリクスTOP投稿をAIが分析します。先に「メトリクス更新」が必要です。APIを叩き直しません。
+              </div>
+
+              <form id="researchForm" class="form-grid">
+                <input name="id" type="hidden" />
+                <input name="research_type" id="researchTypeHidden" type="hidden" value="own" />
+
+                <label>アカウント<select name="account_id" id="researchAccountSelect"></select></label>
+                <label>CLI<select name="source_cli" id="researchCliSelect"></select></label>
+                <label class="wide">タイトル<small>後で一覧から識別するための名前</small><input name="title" type="text" placeholder="例: 自社バズり分析 2025Q1 / AI教育ジャンル競合調査" /></label>
+
+                <!-- 競合WEBリサーチのみ表示 -->
+                <label id="researchContentGenreLabel" style="display:none">発信ジャンル<small>必須 — 例: スピリチュアル系、AI教育、筋トレ</small><input name="content_genre" type="text" placeholder="スピリチュアル系" /></label>
+                <label id="researchMinViewsLabel" style="display:none">最低表示回数<small>この数以上の表示回数がある投稿のみ収集（0=全件、推奨: 1000）</small><input name="min_views" type="number" value="1000" min="0" /></label>
+
+                <label>抽出投稿数<small>キーワードあたり（推奨: 3〜5件）</small><input name="target_post_count" type="number" value="3" min="1" max="10" /></label>
+                <label class="wide">指示メモ<span class="field-hint">任意</span><textarea name="seed_notes" rows="3" placeholder="自社: バズ判定の基準など　／　競合: ターゲット層・角度・検索KWなど"></textarea></label>
+
+                <div class="wide">
+                  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+                    <button type="submit" class="ghost-button">保存</button>
+                    <button type="button" id="runOwnBuzzButton" class="primary-button">▶ 自社投稿を分析</button>
+                    <button type="button" id="runResearchButton" class="primary-button" style="display:none">▶ WEBリサーチを実行</button>
+                    <button type="button" id="generateKeywordsButton" class="primary-button" style="display:none">① キーワードを生成</button>
+                  </div>
+                  <p class="muted" style="font-size:12px;margin-top:6px">先に「保存」してから「実行」してください。実行にはCLIを使用するため数十秒かかります。</p>
+                </div>
+              </form>
+
+              <!-- STEP2: キーワード選択 (competitor only, shown after keyword generation) -->
+              <div id="keywordSelectionPanel" style="display:none;margin-top:16px;padding:16px;background:var(--bg-2,#f8f9fa);border-radius:8px;border:1px solid var(--border)">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+                  <strong style="font-size:13px">② 検索するキーワードを選択・追加</strong>
+                  <div style="display:flex;gap:8px">
+                    <button type="button" class="ghost-button" style="font-size:12px;padding:3px 10px" onclick="toggleAllKeywords(true)">全選択</button>
+                    <button type="button" class="ghost-button" style="font-size:12px;padding:3px 10px" onclick="toggleAllKeywords(false)">全解除</button>
+                  </div>
+                </div>
+                <div id="keywordCheckboxes" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px"></div>
+                <!-- 自由入力でキーワードを追加 -->
+                <div style="display:flex;gap:8px;margin-bottom:14px;align-items:center">
+                  <input id="customKeywordInput" type="text" placeholder="キーワードを追加（例：パワーストーン）" style="flex:1;font-size:13px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg,#fff)" onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomKeyword()}" />
+                  <button type="button" class="ghost-button" style="font-size:12px;white-space:nowrap" onclick="addCustomKeyword()">＋ 追加</button>
+                </div>
+                <button type="button" id="runKeywordSearchButton" class="primary-button">③ 選択したキーワードでThreads検索</button>
+                <p class="muted" style="font-size:12px;margin-top:6px">Playwrightでキーワードごとにスクレイピングします。キーワード数×数十秒かかります。</p>
+              </div>
+
+              <!-- 競合アカウント個別分析 -->
+              <div id="competitorAccountPanel" style="display:none;margin-top:16px;padding:16px;background:var(--bg-2,#f8f9fa);border-radius:8px;border:1px solid var(--border)">
+                <strong style="font-size:13px">📌 特定アカウントのバズ分析（オプション）</strong>
+                <p class="muted" style="font-size:12px;margin:6px 0 10px">ThreadsのユーザーIDを入力すると、そのアカウントの直近100投稿を取得してバズ投稿TOP10とAI戦略分析を出します。</p>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <input id="competitorAccountInput" type="text" placeholder="@username（@なしでもOK）" style="flex:1;font-size:13px;padding:5px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg,#fff)" />
+                  <button type="button" class="primary-button" style="white-space:nowrap" onclick="runCompetitorAccountAnalysis()">分析開始</button>
+                </div>
+                <div id="competitorAccountResult" style="margin-top:12px"></div>
+              </div>
+            </article>
+
+            <!-- 結果パネル: 選択中リサーチの詳細 -->
+            <article class="panel" id="researchResultPanel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">結果確認</p>
+                  <h3>収集データとナレッジ</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:10px">上の分析一覧で選択したリサーチの結果です。バズ投稿の一覧と抽出されたナレッジパターンを確認できます。</p>
+              <div id="researchResultMeta"></div>
+              <div id="researchSummaryCards" class="summary-strip"></div>
+              <div id="researchKeywordStats" style="display:none"></div>
+              <div id="researchSummaryBox" class="summary-box"></div>
+
+              <div class="subsection">
+                <div class="subsection-header">
+                  <h4>投稿一覧（表示順）</h4>
+                  <p class="muted">収集した投稿の一覧です。ツリー投稿は自己返信の続きも含みます。</p>
+                </div>
+                <div id="researchPostsTable" class="table-wrap"></div>
+              </div>
+
+              <div class="subsection">
+                <div class="subsection-header">
+                  <h4>ナレッジ化済みパターン</h4>
+                  <p class="muted">抽出・保存されたバズりパターンです。ナレッジ画面でも確認できます。</p>
+                </div>
+                <div id="researchPatternsTable" class="table-wrap"></div>
+              </div>
+
+            </article>
+
+            <!-- AI分析パネル -->
+            <article class="panel" id="researchAiPanel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">AI分析</p>
+                  <h3>勝ち筋分析</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">収集した投稿をAIが分析し、このジャンルで勝つための戦略・パターン・注意点をまとめます。</p>
+              <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+                <button type="button" id="winningAnalysisButton" class="primary-button">AIによる勝ち筋分析を実行 →</button>
+                <button type="button" id="saveWinningKnowledgeButton" class="ghost-button" style="display:none" onclick="saveWinningAsKnowledge()">勝ち筋をナレッジに保存</button>
+              </div>
+              <div id="winningAnalysisResult" style="display:none;margin-top:12px;padding:16px;background:var(--bg-2,#f8f9fa);border-radius:8px;border:1px solid var(--border);white-space:pre-wrap;line-height:1.8;font-size:13px"></div>
+            </article>
+
+          </section>
+        </section>
+
+        <section id="knowledgeScreen" class="screen">
+          <section class="screen-single">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">ナレッジ作成</p>
+                  <h3>1. 型を整理して再利用できる形にする</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                投稿生成AIに渡す「型の手引き書」です。カードに書いた内容がそのままAIへの指示になります。<br>
+                リサーチの「型を分析」から自動生成されるほか、ここで手動作成・編集できます。一覧の行をクリックすると編集できます。
+              </p>
+              <form id="knowledgeForm" class="form-grid">
+                <input name="id" type="hidden" />
+                <input name="account_id" type="hidden" id="knowledgeAccountId" />
+                <input name="research_project_id" type="hidden" value="0" />
+                <input name="source_count" type="hidden" value="0" />
+                <input name="score" type="hidden" value="0" />
+                <input name="signal_summary" type="hidden" value="" />
+                <input name="raw_result_json" type="hidden" value="{}" />
+                <input name="card_type" type="hidden" id="knowledgeCardType" value="pattern" />
+                <label class="wide">カード種別
+                  <div class="button-group" style="margin-top:4px">
+                    <button type="button" class="toggle-btn active" id="cardTypePatternBtn" onclick="setCardType('pattern')">型（パターン）</button>
+                    <button type="button" class="toggle-btn" id="cardTypeWinningBtn" onclick="setCardType('winning')">勝ち筋（戦略）</button>
+                  </div>
+                </label>
+                <label class="wide">タイトル<input name="title" type="text" placeholder="例: 問いかけ→共感→CTA型" /></label>
+                <label class="wide">型の種類
+                  <small>カードの分類ラベルです。一覧のフィルターに使えます。<br>
+                  ▼ 基本4種は「投稿の各要素を担当するカード」で、複数枚を組み合わせて使います。例：構成カード1枚＋CTA カード1枚＋スレッドカード1枚 → 3枚セットで1つの投稿スタイルを定義。</small>
+                  <select id="patternKindSelect" onchange="onPatternKindSelectChange()">
+                    <optgroup label="── 基本4種（組み合わせて使う要素別カード）──">
+                      <option value="posting_pattern">構成型（投稿型）─「どんな流れで書くか」冒頭→展開→締めの骨格を定義</option>
+                      <option value="cta_pattern">CTA型 ─「最後に何を促すか」フォロー・DM・保存などの締め一文を定義</option>
+                      <option value="media_pattern">メディア型 ─「画像・動画をどう使うか」ビジュアルのルールを定義</option>
+                      <option value="thread_pattern">スレッド型 ─「何投稿で構成するか」単発か連投かの構造を定義</option>
+                    </optgroup>
+                    <optgroup label="── コンテンツ手法 ──">
+                      <option value="story_pattern">ストーリー型 ─ 体験談・エピソードで共感を引く</option>
+                      <option value="education_pattern">教育型 ─ 知識・ノウハウをわかりやすく伝える</option>
+                      <option value="question_pattern">問いかけ型 ─ 読者に質問を投げかけて反応を促す</option>
+                      <option value="list_pattern">リスト型 ─ 箇条書き・番号付きで整理して伝える</option>
+                      <option value="before_after_pattern">ビフォーアフター型 ─ 変化・成果を対比で見せる</option>
+                      <option value="problem_solution_pattern">問題解決型 ─ 悩みを提示して解決策を示す</option>
+                      <option value="contrast_pattern">対比型 ─「〇〇 vs △△」で違いを明確にする</option>
+                      <option value="curiosity_pattern">興味誘引型 ─ 続きが気になるフックで引き込む</option>
+                    </optgroup>
+                    <optgroup label="── 感情・共感系 ──">
+                      <option value="empathy_pattern">共感型 ─ 読者の感情・悩みに寄り添う</option>
+                      <option value="opinion_pattern">意見型 ─ 自分の考えや主張を率直に伝える</option>
+                      <option value="quote_pattern">名言・引用型 ─ 響く言葉を引用してメッセージを強める</option>
+                      <option value="behind_scene_pattern">舞台裏型 ─ 制作過程・日常をのぞき見せする</option>
+                    </optgroup>
+                    <optgroup label="── 拡散・信頼獲得系 ──">
+                      <option value="social_proof_pattern">実績証明型 ─ 数字・事例・実績で信頼を得る</option>
+                      <option value="trend_pattern">トレンド型 ─ 時事・流行に乗って拡散を狙う</option>
+                      <option value="challenge_pattern">チャレンジ型 ─ 挑戦・目標を宣言して応援を集める</option>
+                      <option value="poll_pattern">参加型 ─ 投票・アンケートで読者を巻き込む</option>
+                    </optgroup>
+                    <optgroup label="── 情報提供系 ──">
+                      <option value="tutorial_pattern">ハウツー型 ─ 手順・やり方をステップで説明する</option>
+                      <option value="review_pattern">レビュー・感想型 ─ 使ってみた正直な感想</option>
+                      <option value="announcement_pattern">お知らせ型 ─ 新商品・イベント・更新を告知する</option>
+                      <option value="seasonal_pattern">季節・記念日型 ─ 時期に合わせたコンテンツ</option>
+                    </optgroup>
+                    <optgroup label="────────────">
+                      <option value="__custom__">その他（自由に入力）</option>
+                    </optgroup>
+                  </select>
+                  <input id="patternKindCustomInput" type="text" placeholder="型の名前を自由に入力してください" oninput="onPatternKindCustomInput()" style="display:none;margin-top:6px" />
+                  <input id="patternKindHidden" name="pattern_kind" type="hidden" value="posting_pattern" />
+                </label>
+                <label class="wide">型の説明<small>投稿生成AIに渡される手引きです。「どんな構成で、どんな文体で、何を意識して書くか」を自由に記述してください。</small><textarea name="guidance" rows="5" placeholder="例: 冒頭で読者に問いを投げかけ、共感を引き出したあと具体的な解決策を提示する。締めはフォロー促進のCTAで終わる。文体は断定口調で短く。"></textarea></label>
+                <div class="wide">
+                  <div style="font-size:13px;font-weight:500;margin-bottom:6px">投稿作成フォームへの表示</div>
+                  <p class="muted" style="font-size:11px;margin-bottom:8px">投稿作成フォームのナレッジ選択肢に出すかどうかを設定します。OFFにするとAIに渡されなくなります。</p>
+                  <input name="active" type="hidden" id="knowledgeActiveValue" value="true" />
+                  <div style="display:flex;gap:8px">
+                    <button type="button" id="knowledgeActiveOnBtn" onclick="setKnowledgeActive(true)" class="primary-button" style="flex:1">選択肢に表示する</button>
+                    <button type="button" id="knowledgeActiveOffBtn" onclick="setKnowledgeActive(false)" class="ghost-button" style="flex:1">選択肢から除外する</button>
+                  </div>
+                </div>
+                <div class="wide form-actions">
+                  <button type="submit" class="primary-button">保存</button>
+                  <button type="button" class="ghost-button" onclick="resetKnowledgeForm()">新規作成</button>
+                </div>
+              </form>
+
+              <div class="panel-header" style="margin-top:24px">
+                <div>
+                  <p class="eyebrow">確認</p>
+                  <h3>2. 保存済みナレッジを見直す</h3>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:12px;flex-wrap:nowrap;margin-bottom:10px;white-space:nowrap">
+                <label style="display:inline-flex;align-items:center;gap:6px;font-size:13px;white-space:nowrap">型で絞り込む<select id="knowledgeFilterSelect" onchange="filterKnowledgeCards(this.value)" style="font-size:13px;padding:3px 6px"><option value="">すべて表示</option></select></label>
+                <label style="display:inline-flex;align-items:center;gap:4px;font-size:13px;white-space:nowrap"><input type="checkbox" id="knowledgeSelectAll" onchange="toggleAllKnowledgeCards(this.checked)" />全選択</label>
+                <button class="ghost-button" style="font-size:12px;padding:3px 10px;color:#c00;white-space:nowrap" onclick="bulkDeleteKnowledgeCards()">選択を削除</button>
+              </div>
+              <div id="knowledgeCardsTable" class="table-wrap"></div>
+            </article>
+
+            <!-- ── ナレッジアップロード（v10: ファイル取込→AI型生成） ── -->
+            <article class="panel" id="knowledgeUploadsPanel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">アップロード</p>
+                  <h3>ナレッジアップロード（ファイル取込）</h3>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button type="button" class="primary-button" onclick="openKnowledgeCategoryModal()">+ 新規カテゴリ</button>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                .txt / .md / .pdf / .docx をカテゴリ単位でまとめてアップロード。本文はSQLiteに抽出保存され、
+                「投稿の型を生成」を押すとカテゴリ内の全ファイルを材料に AI が型を生成しナレッジカードに自動登録します。
+                既存のローカルパス指定（AIクローン工場連携 / workspace_root）はそのまま並列で使えます。
+              </p>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <select id="knowledgeUploadAccountFilter" onchange="renderKnowledgeCategories()"
+                        style="font-size:13px;padding:4px 8px">
+                  <option value="">すべてのアカウント</option>
+                </select>
+                <span id="knowledgeCategoryCountLabel" class="muted" style="font-size:12px"></span>
+              </div>
+              <div id="knowledgeCategoriesList"></div>
+            </article>
+
+            <!-- カテゴリ作成・編集 モーダル -->
+            <div id="knowledgeCategoryModal" class="modal-overlay" style="display:none"
+                 onclick="if(event.target===this)closeKnowledgeCategoryModal()">
+              <div class="modal-content" style="max-width:560px;width:95vw">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                  <h3 id="knowledgeCategoryModalTitle" style="margin:0">カテゴリ作成</h3>
+                  <button type="button" onclick="closeKnowledgeCategoryModal()"
+                          style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">&times;</button>
+                </div>
+                <form onsubmit="event.preventDefault();saveKnowledgeCategoryFromModal()">
+                  <input type="hidden" id="knowledgeCategoryId" value="">
+                  <div style="display:grid;grid-template-columns:1fr 2fr;gap:12px;margin-bottom:12px">
+                    <label style="display:flex;flex-direction:column;gap:4px">
+                      <span style="font-size:12px;font-weight:600">アカウント</span>
+                      <select id="knowledgeCategoryAccountId" required></select>
+                    </label>
+                    <label style="display:flex;flex-direction:column;gap:4px">
+                      <span style="font-size:12px;font-weight:600">カテゴリ名</span>
+                      <input type="text" id="knowledgeCategoryName" required maxlength="100"
+                             placeholder="例: 自社サービスの紹介素材">
+                    </label>
+                  </div>
+                  <label style="display:flex;flex-direction:column;gap:4px;margin-bottom:12px">
+                    <span style="font-size:12px;font-weight:600">説明（任意）</span>
+                    <textarea id="knowledgeCategoryDescription" rows="3" maxlength="500"
+                              placeholder="このカテゴリにどんな材料を入れるか、どんな型を生成したいか。AIプロンプトに使われます。"
+                              style="font-size:13px;resize:vertical"></textarea>
+                  </label>
+                  <div style="display:flex;justify-content:flex-end;gap:8px">
+                    <button type="button" class="ghost-button" onclick="closeKnowledgeCategoryModal()">キャンセル</button>
+                    <button type="submit" class="primary-button">保存</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+            <!-- 型生成結果 モーダル -->
+            <div id="knowledgeTemplateResultModal" class="modal-overlay" style="display:none"
+                 onclick="if(event.target===this)closeKnowledgeTemplateResultModal()">
+              <div class="modal-content" style="max-width:760px;width:95vw">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                  <h3 style="margin:0">投稿の型を生成しました</h3>
+                  <button type="button" onclick="closeKnowledgeTemplateResultModal()"
+                          style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">&times;</button>
+                </div>
+                <p class="muted" style="font-size:12px;margin-bottom:8px">
+                  ナレッジカードとして自動保存されました。上のナレッジカード一覧で確認・編集できます。
+                </p>
+                <pre id="knowledgeTemplateResultText"
+                     style="white-space:pre-wrap;background:var(--bg-2,#f7f7f8);padding:12px;border-radius:6px;max-height:60vh;overflow:auto;font-size:12px;font-family:inherit"></pre>
+                <div style="display:flex;justify-content:flex-end;margin-top:12px">
+                  <button type="button" class="primary-button" onclick="closeKnowledgeTemplateResultModal()">閉じる</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </section>
+
+        <section id="publishingScreen" class="screen">
+          <!-- 投稿一覧（抜粋） + キュー管理 -->
+          <section id="publishingSummaryView" class="screen-single">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">投稿</p>
+                  <h3>投稿一覧</h3>
+                </div>
+                <button class="primary-button" onclick="openPostModal()">+ 新しい投稿を作成</button>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:10px">
+                「+ 新しい投稿を作成」で投稿ジョブを作成できます。手動で本文を書くか、AIに生成させるか選べます。<br>
+                作成した投稿は「今すぐ投稿」「予約投稿」「キューに追加」「下書き保存」のいずれかで配信方法を選びます。
+              </p>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+                <select id="jobAccountFilter" onchange="renderJobsTable()" style="font-size:13px;padding:4px 8px">
+                  <option value="">すべてのアカウント</option>
+                </select>
+                <span id="jobCountLabel" class="muted" style="font-size:12px"></span>
+              </div>
+              <div id="jobsTable" class="table-wrap"></div>
+              <div id="jobsShowAllRow" style="text-align:center;padding:8px;display:none">
+                <button class="ghost-button" onclick="openJobsFullView()">すべての投稿を表示</button>
+              </div>
+            </article>
+
+          <!-- 投稿全一覧（別画面） -->
+          </section>
+          <!-- publishingFullView: モーダルに移動済み（後方の jobsFullModal） -->
+
+          <section id="publishingQueuesView" class="screen-single">
+
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">キュー</p>
+                  <h3>配信キュー管理</h3>
+                </div>
+                <button class="ghost-button" onclick="openQueueModal()">+ キューを作成</button>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:10px">
+                キューとは「投稿のストック場所＋自動配信スケジュール」です。キューに投稿を積んでおくと、設定した時間帯・頻度で自動的に投稿されます。<br>
+                <strong>自律運用を使う場合は、キューが1つ以上必要です。</strong>自律モードのAIはここに投稿を自動生成します。
+              </p>
+              <div id="postQueuesTable" class="table-wrap"></div>
+            </article>
+          </section>
+        </section>
+
+        <!-- ══════════════════════════════════════════════
+             投稿作成 / 編集モーダル
+        ══════════════════════════════════════════════ -->
+        <div id="postModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePostModal()">
+          <div class="modal-box" style="max-width:760px;width:95vw">
+
+            <!-- ヘッダー -->
+            <div class="modal-header">
+              <h3 id="postModalTitle">投稿を作成</h3>
+              <button class="modal-close" onclick="closePostModal()">✕</button>
+            </div>
+
+            <!-- メモ（任意） -->
+            <div style="padding:0 24px 12px">
+              <input id="pmTitle" type="text" placeholder="メモ（任意）— 内部管理用の名前" style="width:100%;box-sizing:border-box" />
+              <input id="pmId" type="hidden" />
+            </div>
+
+            <!-- 共通セクション: アカウント・目的（両タブ共通） -->
+            <div id="pmSharedFields" style="padding:12px 24px;border-bottom:1px solid var(--border)">
+              <div class="form-grid" style="gap:12px">
+                <label>アカウント
+                  <select id="pmAccountSelect"></select>
+                </label>
+                <input type="hidden" id="pmUnitSelect" value="" />
+
+                <div class="wide">
+                  <span class="field-label">投稿の目的</span>
+                  <div class="button-group" style="margin-top:6px" id="pmObjectiveGroup">
+                    <button type="button" class="toggle-btn" data-value="education" onclick="selectObjective(this)">📚 教育</button>
+                    <button type="button" class="toggle-btn" data-value="branding" onclick="selectObjective(this)">✨ ブランディング</button>
+                    <button type="button" class="toggle-btn" data-value="empathy" onclick="selectObjective(this)">💭 共感・日常</button>
+                    <button type="button" class="toggle-btn" data-value="interaction" onclick="selectObjective(this)">💬 交流</button>
+                    <button type="button" class="toggle-btn" data-value="cta" onclick="selectObjective(this)">📣 誘導・CTA</button>
+                    <button type="button" class="toggle-btn" data-value="entertainment" onclick="selectObjective(this)">🎭 エンタメ</button>
+                    <button type="button" class="toggle-btn" data-value="announce" onclick="selectObjective(this)">📢 告知</button>
+                  </div>
+                  <input type="hidden" id="pmObjective" />
+                </div>
+
+                <!-- CTA詳細（誘導・CTA選択時のみ表示） -->
+                <div class="wide" id="pmCtaDetailSection" style="display:none">
+                  <span class="field-label">CTAアクション<span class="field-hint" style="font-weight:normal;font-size:11px;margin-left:6px">複数選択可</span></span>
+                  <div class="button-group" style="margin-top:6px" id="pmCtaActionGroup">
+                    <button type="button" class="toggle-btn" data-value="follow" onclick="toggleCtaAction(this)">フォロー</button>
+                    <button type="button" class="toggle-btn" data-value="like" onclick="toggleCtaAction(this)">いいね</button>
+                    <button type="button" class="toggle-btn" data-value="repost" onclick="toggleCtaAction(this)">リポスト</button>
+                    <button type="button" class="toggle-btn" data-value="comment" onclick="toggleCtaAction(this)">コメント</button>
+                    <button type="button" class="toggle-btn" data-value="link_click" onclick="toggleCtaAction(this)">リンク誘導</button>
+                    <button type="button" class="toggle-btn" data-value="dm" onclick="toggleCtaAction(this)">DM誘導</button>
+                    <button type="button" class="toggle-btn" data-value="save" onclick="toggleCtaAction(this)">保存</button>
+                  </div>
+                  <input type="hidden" id="pmCtaAction" />
+                  <div id="pmCtaUrlSection" style="display:none;margin-top:8px">
+                    <label>誘導先URL
+                      <input id="pmCtaUrl" type="url" placeholder="https://..." style="width:100%;box-sizing:border-box" />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- タブ: 手動 / AI生成 -->
+            <div class="modal-tabs" id="postModalTabs">
+              <button class="modal-tab active" data-tab="manual" onclick="switchPostTab('manual')">✏️ 手動で書く</button>
+              <button class="modal-tab" data-tab="ai" onclick="switchPostTab('ai')">🤖 AIで生成</button>
+            </div>
+
+            <!-- 手動タブ -->
+            <div id="pmTabManual" class="modal-tab-content" style="padding:16px 24px">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+                <span class="field-label" style="margin:0">投稿内容</span>
+                <span class="muted" style="font-size:11px">Threads は1投稿500文字まで。「＋ ツリーを追加」で複数投稿に分割できます。</span>
+              </div>
+              <div id="pmPostsList"></div>
+            </div>
+
+            <!-- AI生成タブ -->
+            <div id="pmTabAi" class="modal-tab-content" style="display:none;padding:16px 24px">
+              <div class="form-grid" style="gap:12px">
+                <label>ナレッジカード<small>ナレッジ画面で登録した型・パターンを適用</small>
+                  <select id="pmKnowledgeCardSelect">
+                    <option value="0">── 使わない ──</option>
+                  </select>
+                </label>
+
+                <label class="wide">指示メモ<small>ターゲット読者、感情、必ず入れたいフレーズなど</small>
+                  <textarea id="pmPrompt" rows="3" placeholder="ターゲット読者、感情、必ず入れたいフレーズなど" style="width:100%;box-sizing:border-box;margin-top:4px"></textarea>
+                </label>
+
+                <div class="wide" style="text-align:right">
+                  <button type="button" class="primary-button" id="pmGenerateBtn" onclick="generatePostText()">🤖 AIで本文を生成</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- 共通: AI生成後の本文確認（AIタブ使用時のみ表示） -->
+            <div id="pmAiResultSection" style="padding:0 24px 12px;border-top:1px solid var(--border);display:none">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;margin-bottom:10px;flex-wrap:wrap;gap:6px">
+                <span class="field-label" style="margin:0">生成結果（確認・編集）</span>
+                <span class="muted" style="font-size:11px">Threads は1投稿500文字まで。「＋ ツリーを追加」で分割できます。</span>
+              </div>
+              <div id="pmAiPostsList"></div>
+
+              <div class="form-grid" style="margin-top:14px;gap:10px">
+                <label>CLI
+                  <select id="pmCliSelect"></select>
+                </label>
+              </div>
+            </div>
+
+            <!-- フッター: 配信方法 -->
+            <input type="hidden" id="pmThreadPolicy" value="single" />
+            <div class="modal-footer" style="border-top:1px solid var(--border);padding:16px 24px">
+              <span class="field-label" style="display:block;margin-bottom:10px">配信方法</span>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start">
+                <button type="button" class="primary-button" onclick="submitPost('direct')">▶ 今すぐ投稿</button>
+                <button type="button" class="ghost-button" onclick="submitPost('scheduled')">📅 予約投稿</button>
+                <button type="button" class="ghost-button" onclick="submitPost('queue')">📦 キューに追加</button>
+                <button type="button" class="ghost-button" onclick="submitPost('draft')">💾 下書き保存</button>
+              </div>
+
+              <!-- 予約: 日時 -->
+              <div id="pmScheduledPanel" style="display:none;margin-top:12px">
+                <label>投稿予定日時
+                  <input type="datetime-local" id="pmScheduledFor" style="margin-left:8px" />
+                </label>
+                <button type="button" class="primary-button" style="margin-left:8px" onclick="confirmScheduled()">予約を確定</button>
+              </div>
+
+              <!-- キュー: 選択 + 設定 -->
+              <div id="pmQueuePanel" style="display:none;margin-top:12px">
+                <div style="background:var(--primary-soft);border-left:3px solid var(--primary);border-radius:0 8px 8px 0;padding:8px 12px;margin-bottom:12px;font-size:12px;line-height:1.6">
+                  <strong>キューとは？</strong><br>
+                  投稿をまとめてストックしておき、キューに設定したスケジュール（例：1日2回・9〜21時の間）で自動的に順番に投稿されます。複数の投稿を積んでおけば自動で消化されます。
+                </div>
+                <div id="pmQueueEmptyNote" style="display:none;color:#c00;font-size:12px;margin-bottom:8px">
+                  ⚠ キューがまだありません。先に「投稿」画面でキューを作成してください。
+                </div>
+                <div class="form-grid" style="gap:10px">
+                  <label>追加するキュー
+                    <select id="pmQueueSelect">
+                      <option value="">── キューを選択 ──</option>
+                    </select>
+                  </label>
+                  <label>この投稿の使い切り設定
+                    <span class="field-hint">何回投稿したらキューから除外するか</span>
+                    <select id="pmQueueMaxUses">
+                      <option value="0">何度でも繰り返す</option>
+                      <option value="1">1回投稿したら除外</option>
+                      <option value="3">3回投稿したら除外</option>
+                      <option value="5">5回投稿したら除外</option>
+                      <option value="10">10回投稿したら除外</option>
+                    </select>
+                  </label>
+                </div>
+                <button type="button" class="primary-button" style="margin-top:10px" onclick="confirmQueue()">このキューに追加する</button>
+              </div>
+
+              <div id="pmStatusMsg" style="margin-top:10px;font-size:13px;color:var(--text-muted)"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- キュー作成 / 編集モーダル -->
+        <div id="queueModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeQueueModal()">
+          <div class="modal-box" style="max-width:560px;width:95vw">
+            <div class="modal-header">
+              <h3 id="queueModalTitle">キューを作成</h3>
+              <button class="modal-close" onclick="closeQueueModal()">✕</button>
+            </div>
+            <div style="padding:16px 24px 24px">
+              <div style="background:var(--primary-soft);border-left:3px solid var(--primary);border-radius:0 8px 8px 0;padding:8px 12px;margin-bottom:16px;font-size:12px;line-height:1.6">
+                キューに投稿をストックしておくと、ここで設定したスケジュールに従ってスケジューラが自動投稿します。投稿は「配信開始時刻〜終了時刻」の範囲内でランダムなタイミングで投稿されます。
+              </div>
+              <input type="hidden" id="qmId" />
+              <div class="form-grid" style="gap:12px">
+                <label class="wide">キュー名
+                  <input type="text" id="qmTitle" placeholder="例: 日常投稿キュー" style="width:100%;box-sizing:border-box;margin-top:4px" />
+                </label>
+                <label>アカウント
+                  <select id="qmAccountSelect"></select>
+                </label>
+                <label>スケジュール
+                  <span class="field-hint">いつ投稿するか</span>
+                  <select id="qmScheduleType" onchange="updateQueueFreqUI()">
+                    <option value="daily">毎日</option>
+                    <option value="weekdays">曜日を指定（毎週）</option>
+                    <option value="monthday">日付を指定（毎月）</option>
+                  </select>
+                </label>
+                <div id="qmScheduleSub"></div>
+                <label>1日の投稿回数
+                  <span class="field-hint">アクティブな日に何回投稿するか（時間帯内で均等に分散）</span>
+                  <select id="qmPostsPerDay">
+                    <option value="1">1回</option>
+                    <option value="2">2回</option>
+                    <option value="3" selected>3回</option>
+                    <option value="4">4回</option>
+                    <option value="5">5回</option>
+                    <option value="7">7回</option>
+                    <option value="10">10回</option>
+                  </select>
+                </label>
+                <label>投稿できる開始時刻
+                  <span class="field-hint">この時刻以降に投稿される</span>
+                  <input type="time" id="qmWinStart" value="09:00" />
+                </label>
+                <label>投稿できる終了時刻
+                  <span class="field-hint">この時刻を過ぎると当日は投稿しない</span>
+                  <input type="time" id="qmWinEnd" value="21:00" />
+                </label>
+                <label>投稿の選び方
+                  <span class="field-hint">キュー内の投稿をどの順番で選ぶか</span>
+                  <select id="qmPickMode">
+                    <option value="sequential">順番どおり（登録順に消化）</option>
+                    <option value="shuffle">シャッフル（一巡するまで重複なし）</option>
+                    <option value="random">完全ランダム</option>
+                  </select>
+                </label>
+                <label class="wide toggle">
+                  <input type="checkbox" id="qmRecycle" />
+                  <span>エバーグリーン（投稿済みも再利用する）</span>
+                </label>
+                <div id="qmRecycleSub" style="display:none;padding-left:28px;margin-top:-8px">
+                  <label>再利用までの間隔（日）
+                    <span class="field-hint">同じ投稿を再利用するまでの最低日数。0で制限なし</span>
+                    <input type="number" id="qmCooldownDays" min="0" max="365" value="7" style="width:80px" />
+                  </label>
+                </div>
+                <label class="wide toggle">
+                  <input type="checkbox" id="qmActive" checked />
+                  <span>このキューを有効にする（無効にするとスケジューラが無視します）</span>
+                </label>
+              </div>
+              <div style="margin-top:16px;text-align:right">
+                <button type="button" class="primary-button" onclick="saveQueue()">キューを保存</button>
+              </div>
+              <div id="qmStatusMsg" style="margin-top:8px;font-size:13px;color:var(--text-muted)"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="jobsFullModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeJobsFullView()">
+          <div class="modal-box" style="max-width:1000px;width:95vw">
+            <div class="modal-header">
+              <div>
+                <p class="eyebrow">投稿</p>
+                <h3>投稿全一覧</h3>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="ghost-button" onclick="openStockPostsModal()">🔥 ストック投稿</button>
+                <button class="primary-button" onclick="openPostModal()">+ 新しい投稿を作成</button>
+                <button class="modal-close" onclick="closeJobsFullView()">✕</button>
+              </div>
+            </div>
+            <!-- v8: ステータスタブ（threads-auto-af 由来 UX） -->
+            <div id="fullJobStatusTabs" style="display:flex;gap:4px;flex-wrap:wrap;padding:12px 24px 0;border-bottom:1px solid var(--border-color,#eee)">
+              <button type="button" class="status-tab is-active" data-status="" onclick="setFullJobStatusTab('')">
+                すべて <span class="status-tab-badge" data-badge="">0</span>
+              </button>
+              <button type="button" class="status-tab" data-status="draft" onclick="setFullJobStatusTab('draft')">
+                下書き <span class="status-tab-badge" data-badge="draft">0</span>
+              </button>
+              <button type="button" class="status-tab" data-status="ready" onclick="setFullJobStatusTab('ready')">
+                準備完了 <span class="status-tab-badge" data-badge="ready">0</span>
+              </button>
+              <button type="button" class="status-tab" data-status="scheduled" onclick="setFullJobStatusTab('scheduled')">
+                📅 予約済み <span class="status-tab-badge" data-badge="scheduled">0</span>
+              </button>
+              <button type="button" class="status-tab" data-status="posted" onclick="setFullJobStatusTab('posted')">
+                ✅ 投稿済み <span class="status-tab-badge" data-badge="posted">0</span>
+              </button>
+              <button type="button" class="status-tab" data-status="error" onclick="setFullJobStatusTab('error')">
+                ⚠️ エラー <span class="status-tab-badge" data-badge="error">0</span>
+              </button>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 24px">
+              <select id="fullJobAccountFilter" onchange="renderFullJobsTable()" style="font-size:13px;padding:4px 8px">
+                <option value="">すべてのアカウント</option>
+              </select>
+              <!-- タブへ移行したため hidden（互換のため残置） -->
+              <select id="fullJobStatusFilter" onchange="renderFullJobsTable()" style="display:none">
+                <option value="">すべてのステータス</option>
+                <option value="draft">下書き</option>
+                <option value="ready">準備完了</option>
+                <option value="scheduled">予約中</option>
+                <option value="posted">投稿済み</option>
+                <option value="error">エラー</option>
+              </select>
+              <select id="fullJobQueueFilter" onchange="renderFullJobsTable()" style="font-size:13px;padding:4px 8px">
+                <option value="">すべてのキュー</option>
+              </select>
+              <span id="fullJobCountLabel" class="muted" style="font-size:12px"></span>
+            </div>
+            <div style="padding:0 24px 24px;max-height:70vh;overflow-y:auto">
+              <div id="fullJobsTable" class="table-wrap"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- v8: ストック投稿モーダル（threads-auto-af 由来） -->
+        <div id="stockPostsModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeStockPostsModal()">
+          <div class="modal-box" style="max-width:900px;width:92vw">
+            <div class="modal-header">
+              <div>
+                <p class="eyebrow">投稿</p>
+                <h3>🔥 ストック投稿（バズ判定で昇格した再利用候補）</h3>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="ghost-button" onclick="promoteStockNow()">🔍 今すぐ再集計</button>
+                <button class="modal-close" onclick="closeStockPostsModal()">✕</button>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:12px 24px">
+              <select id="stockAccountFilter" onchange="renderStockPostsTable()" style="font-size:13px;padding:4px 8px">
+                <option value="">すべてのアカウント</option>
+              </select>
+              <span class="muted" style="font-size:12px">※ 各アカウントの「バズ閾値（views）」超えの投稿済みジョブが自動昇格します。閾値は設定画面から。</span>
+              <span id="stockCountLabel" class="muted" style="font-size:12px"></span>
+            </div>
+            <div style="padding:0 24px 24px;max-height:70vh;overflow-y:auto">
+              <div id="stockPostsTable" class="table-wrap"></div>
+            </div>
+          </div>
+        </div>
+
+        <div id="replyConfigModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeReplyConfigModal()">
+          <div class="modal-box" style="max-width:720px;width:90vw">
+            <div class="modal-header">
+              <div>
+                <p class="eyebrow">返信設定</p>
+                <h3>投稿別返信設定</h3>
+              </div>
+              <button class="modal-close" onclick="closeReplyConfigModal()">✕</button>
+            </div>
+            <div id="replyConfigBody" style="padding:0 24px 24px;max-height:70vh;overflow-y:auto">
+              <p class="muted" style="font-size:12px">読込中...</p>
+            </div>
+          </div>
+        </div>
+
+        <section id="repliesScreen" class="screen">
+          <section class="screen-stack">
+
+            <!-- ── セクション1: ルール作成/編集 ── -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">自動返信</p>
+                  <h3>1. 返信ルールを作成する</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                キーワードに反応して自動返信するルールを設定します。対象投稿を絞ることも、全投稿を対象にすることもできます。
+              </p>
+              <div style="padding:8px 12px;background:var(--bg-2);border-radius:6px;font-size:12px;color:var(--muted);margin-bottom:12px;border-left:3px solid var(--accent)">
+                <strong style="color:var(--text)">自動返信の監視対象について</strong><br>
+                スレードの投稿画面から投稿したもの（通常投稿・ツリー投稿）のみ自動返信の対象です。<br>Threadsアプリから直接投稿したものや疎通テストの投稿は監視対象外です。
+              </div>
+              <form id="replyRuleForm" class="form-grid">
+                <input name="id" type="hidden" />
+                <!-- ターゲット設定 -->
+                <label>アカウント<select name="account_id" id="replyAccountSelect"></select></label>
+                <label><span style="display:flex;align-items:baseline;gap:6px">対象投稿<small>空欄なら全投稿が対象</small></span>
+                  <input type="hidden" name="root_post_id" id="replyPostValue" />
+                  <div id="replyPostPicker" class="post-picker">
+                    <div class="post-picker-selected" id="replyPostDisplay" onclick="openPostPicker()">
+                      <span class="post-picker-text">全投稿を対象にする</span>
+                      <span class="post-picker-clear" id="replyPostClear" style="display:none" onclick="event.stopPropagation();clearPostPicker()">&times;</span>
+                    </div>
+                    <div class="post-picker-dropdown" id="replyPostDropdown" style="display:none">
+                      <input type="text" class="post-picker-search" id="replyPostSearch" placeholder="タイトル・投稿IDで検索..." oninput="filterPostPicker()" />
+                      <div class="post-picker-list" id="replyPostList"></div>
+                    </div>
+                  </div>
+                </label>
+                <!-- マッチング設定 -->
+                <label>一致方法<select name="match_type" id="replyMatchTypeSelect" onchange="updateMatchTypeUI()"><option value="partial">部分一致</option><option value="exact">完全一致</option><option value="catchall">キャッチオール（全リプライに反応）</option></select></label>
+                <label id="replyKeywordLabel">キーワード<small>このキーワードを含むリプライが対象</small><input name="keyword" type="text" placeholder="ありがとう" /></label>
+                <!-- 返信モード -->
+                <label>返信モード<select name="reply_mode" id="replyModeSelect" onchange="updateReplyModeUI()"><option value="template">定型文</option><option value="ai">AI返信</option><option value="hybrid">ハイブリッド</option></select></label>
+                <label id="replyCliLabel">返信CLI<select name="source_cli" id="replyCliSelect"></select></label>
+                <!-- 遅延設定 -->
+                <label>最小遅延(秒)<input name="delay_min_seconds" type="number" value="0" min="0" /></label>
+                <label>最大遅延(秒)<input name="delay_max_seconds" type="number" value="0" min="0" /></label>
+                <!-- コンテンツ -->
+                <label class="wide" id="replyTemplateLabel">返信テンプレート<small>{username}でユーザー名に置換</small><textarea name="reply_template" rows="3" placeholder="{username}さん、ありがとうございます。"></textarea></label>
+                <label class="wide" id="replyAiPromptLabel">AIプロンプト<small>相手のリプ内容を読んでAIが返信を生成します。空欄ならデフォルト</small><textarea name="ai_prompt" rows="2" placeholder="フレンドリーな口調で、相手の内容に合わせて返信して"></textarea></label>
+                <label class="toggle"><input name="enabled" type="checkbox" checked /><span>このルールを有効化する</span></label>
+                <div class="wide form-actions" style="display:flex;gap:8px">
+                  <button type="submit" class="primary-button" id="replyRuleSaveBtn">新規保存</button>
+                  <button type="button" class="primary-button" id="replyRuleOverwriteBtn" style="display:none" onclick="overwriteReplyRule()">上書き保存</button>
+                  <button type="button" class="ghost-button" id="replyRuleCancelBtn" style="display:none" onclick="cancelEditReplyRule()">編集キャンセル</button>
+                </div>
+              </form>
+            </article>
+
+            <!-- ── セクション2: ルール一覧 ── -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">ルール一覧</p>
+                  <h3>2. 保存済みルールを管理する</h3>
+                </div>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <select id="replyRuleAccountFilter" onchange="renderReplyRulesTable()" style="font-size:13px;padding:4px 8px">
+                  <option value="">すべてのアカウント</option>
+                </select>
+                <button type="button" class="ghost-button" onclick="openReplyRulesModal()">すべて表示</button>
+                <button type="button" class="ghost-button" onclick="deleteAllReplyRules()">全件削除</button>
+                <span id="replyRuleCountLabel" class="muted" style="font-size:12px"></span>
+              </div>
+              <div id="replyRulesTable" class="table-wrap"></div>
+
+              <!-- ルール一覧 モーダル -->
+              <div id="replyRulesModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeReplyRulesModal()">
+                <div class="modal-content" style="max-width:1100px;width:95vw">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <h3 style="margin:0">返信ルール一覧</h3>
+                    <div style="display:flex;gap:8px;align-items:center">
+                      <button type="button" class="ghost-button" onclick="deleteSelectedReplyRules()">選択削除</button>
+                      <button type="button" class="ghost-button" onclick="deleteAllReplyRules()">全件削除</button>
+                      <button type="button" onclick="closeReplyRulesModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">&times;</button>
+                    </div>
+                  </div>
+                  <div id="replyRulesModalTable" class="table-wrap" style="max-height:70vh;overflow-y:auto"></div>
+                </div>
+              </div>
+            </article>
+
+            <!-- ── セクション3: 投稿別設定 ── -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">投稿別設定</p>
+                  <h3>3. 投稿ごとの返信設定</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                投稿済みのジョブに対して、キーワード付きの個別返信設定を行えます。ルール一覧とは別に、投稿単位で返信を管理します。
+              </p>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <select id="postedJobsAccountFilter" onchange="renderPostedJobsReplyTable()" style="font-size:13px;padding:4px 8px">
+                  <option value="">すべてのアカウント</option>
+                </select>
+                <button type="button" class="ghost-button" onclick="openPostedJobsReplyModal()">すべて表示</button>
+                <button type="button" class="ghost-button" onclick="deleteAllPostReplyConfigs()">全件削除</button>
+              </div>
+              <div id="postedJobsReplyTable" class="table-wrap"></div>
+
+              <!-- 投稿別返信設定 モーダル -->
+              <div id="postedJobsReplyModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePostedJobsReplyModal()">
+                <div class="modal-content" style="max-width:1100px;width:95vw">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                    <h3 style="margin:0">投稿ごとの返信設定 一覧</h3>
+                    <div style="display:flex;gap:8px;align-items:center">
+                      <button type="button" class="ghost-button" onclick="deleteSelectedPostedJobConfigs()">選択削除</button>
+                      <button type="button" class="ghost-button" onclick="deleteAllPostReplyConfigs()">全件削除</button>
+                      <button type="button" onclick="closePostedJobsReplyModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">&times;</button>
+                    </div>
+                  </div>
+                  <div id="postedJobsReplyModalTable" class="table-wrap" style="max-height:70vh;overflow-y:auto"></div>
+                </div>
+              </div>
+            </article>
+
+            <!-- ── セクション4: 返信ログ ── -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">返信ログ</p>
+                  <h3>4. 返信の実行状況を確認する</h3>
+                </div>
+              </div>
+              <div id="replyEventSummary" class="summary-strip compact"></div>
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <select id="replyEventAccountFilter" onchange="renderReplyEventsTable()" style="font-size:13px;padding:4px 8px">
+                  <option value="">すべてのアカウント</option>
+                </select>
+                <button type="button" class="ghost-button" onclick="openReplyEventsModal()">すべて表示</button>
+                <button type="button" class="ghost-button" onclick="deleteAllReplyEvents()">全件削除</button>
+                <span class="muted" style="font-size:11px">スケジューラが自動でリプライを取得します</span>
+              </div>
+              <div id="replyEventsTable" class="table-wrap"></div>
+            </article>
+
+            <!-- 返信ログ モーダル -->
+            <div id="replyEventsModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeReplyEventsModal()">
+              <div class="modal-content" style="max-width:1100px;width:95vw">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                  <h3 style="margin:0">返信ログ一覧</h3>
+                  <div style="display:flex;gap:8px;align-items:center">
+                    <button type="button" class="ghost-button" onclick="deleteSelectedReplyEvents()">選択削除</button>
+                    <button type="button" class="ghost-button" onclick="deleteAllReplyEvents()">全件削除</button>
+                    <button type="button" onclick="closeReplyEventsModal()" style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">&times;</button>
+                  </div>
+                </div>
+                <div id="replyEventsModalTable" class="table-wrap" style="max-height:70vh;overflow-y:auto"></div>
+              </div>
+            </div>
+
+            <!-- ── セクション5: シナリオ分岐型自動リプライ ── -->
+            <article class="panel" id="scenariosPanel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">シナリオ</p>
+                  <h3>5. シナリオ分岐型自動リプライ（ステップ配信）</h3>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <button type="button" class="primary-button" onclick="openScenarioModal()">+ 新規シナリオ</button>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                発動キーワードを検知したら、Day 0 / Day 1 / Day 3 ... と複数ステップで返信を送る仕組みです。
+                同一ユーザーへの重複起動は防止、進行中に別キーワードを検知すると上書き分岐します。
+              </p>
+              <div style="display:flex;gap:14px;border-bottom:1px solid var(--border);margin-bottom:12px">
+                <button type="button" id="scenarioSubTabList" class="ghost-button"
+                        style="border:none;border-bottom:2px solid var(--accent);font-weight:600;border-radius:0"
+                        onclick="switchScenarioSubTab('list')">シナリオ一覧</button>
+                <button type="button" id="scenarioSubTabProgress" class="ghost-button"
+                        style="border:none;border-bottom:2px solid transparent;border-radius:0"
+                        onclick="switchScenarioSubTab('progress')">進行状況</button>
+              </div>
+
+              <div id="scenarioSubPaneList">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                  <select id="scenarioAccountFilter" onchange="renderScenariosTable()"
+                          style="font-size:13px;padding:4px 8px">
+                    <option value="">すべてのアカウント</option>
+                  </select>
+                  <span id="scenarioCountLabel" class="muted" style="font-size:12px"></span>
+                </div>
+                <div id="scenariosTable" class="table-wrap"></div>
+              </div>
+
+              <div id="scenarioSubPaneProgress" style="display:none">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                  <select id="scenarioProgressAccountFilter" onchange="renderScenarioProgressTable()"
+                          style="font-size:13px;padding:4px 8px">
+                    <option value="">すべてのアカウント</option>
+                  </select>
+                  <label style="font-size:12px;display:flex;align-items:center;gap:4px">
+                    <input type="checkbox" id="scenarioProgressIncludeCompleted"
+                           onchange="renderScenarioProgressTable()"> 完了済みも表示
+                  </label>
+                </div>
+                <div id="scenarioProgressTable" class="table-wrap"></div>
+              </div>
+            </article>
+
+            <!-- シナリオ作成・編集 モーダル -->
+            <div id="scenarioModal" class="modal-overlay" style="display:none"
+                 onclick="if(event.target===this)closeScenarioModal()">
+              <div class="modal-content" style="max-width:760px;width:95vw">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+                  <h3 id="scenarioModalTitle" style="margin:0">シナリオ作成</h3>
+                  <button type="button" onclick="closeScenarioModal()"
+                          style="background:none;border:none;font-size:22px;cursor:pointer;color:var(--text-muted)">&times;</button>
+                </div>
+                <form id="scenarioForm" onsubmit="event.preventDefault();saveScenarioFromModal()">
+                  <input type="hidden" id="scenarioId" value="">
+                  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+                    <label style="display:flex;flex-direction:column;gap:4px">
+                      <span style="font-size:12px;font-weight:600">アカウント</span>
+                      <select id="scenarioAccountId" required></select>
+                    </label>
+                    <label style="display:flex;flex-direction:column;gap:4px">
+                      <span style="font-size:12px;font-weight:600">名前</span>
+                      <input type="text" id="scenarioName" required maxlength="100" placeholder="例: 体験申込フォローアップ">
+                    </label>
+                    <label style="display:flex;flex-direction:column;gap:4px">
+                      <span style="font-size:12px;font-weight:600">トリガーキーワード</span>
+                      <input type="text" id="scenarioTriggerKeyword" required maxlength="200" placeholder="例: 申込み">
+                    </label>
+                    <label style="display:flex;flex-direction:column;gap:4px">
+                      <span style="font-size:12px;font-weight:600">マッチタイプ</span>
+                      <select id="scenarioMatchType">
+                        <option value="partial">部分一致</option>
+                        <option value="exact">完全一致</option>
+                      </select>
+                    </label>
+                    <label style="display:flex;flex-direction:column;gap:4px">
+                      <span style="font-size:12px;font-weight:600">AI生成CLI（{{ai}} 用）</span>
+                      <select id="scenarioSourceCli">
+                        <option value="">既定（claude）</option>
+                        <option value="claude">claude</option>
+                        <option value="codex">codex</option>
+                      </select>
+                    </label>
+                    <label style="display:flex;align-items:center;gap:6px;font-size:12px">
+                      <input type="checkbox" id="scenarioEnabled" checked> 有効
+                    </label>
+                  </div>
+
+                  <div style="border-top:1px solid var(--border);margin:12px 0;padding-top:12px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+                      <strong style="font-size:13px">ステップ</strong>
+                      <button type="button" class="ghost-button" onclick="addScenarioStepRow()">+ ステップ追加</button>
+                    </div>
+                    <div id="scenarioStepsEditor"></div>
+                    <p class="muted" style="font-size:11px;margin-top:6px">
+                      <code>{{ai}}</code> でAI生成。<code>{{username}}</code> / <code>{{post_id}}</code> も使えます。
+                      delay_hours: 0=即時, 24=翌日, 72=3日後...
+                    </p>
+                  </div>
+
+                  <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:14px">
+                    <button type="button" class="ghost-button" onclick="closeScenarioModal()">キャンセル</button>
+                    <button type="submit" class="primary-button">保存</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+
+          </section>
+        </section>
+
+        <!-- ══════ 自律運用: アカウント選択 ══════ -->
+        <section id="autoSelectScreen" class="screen">
+          <section class="screen-stack">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">自律運用</p>
+                  <h3>どのアカウントを運用しますか？</h3>
+                </div>
+              </div>
+              <p style="font-size:14px;color:var(--muted);margin-bottom:16px">
+                アカウントを選んで、AIによる自動投稿を開始・管理できます。<br>
+                手動での予約投稿や返信はいつでも併用できます。
+              </p>
+              <div id="autoSelectCards" style="display:flex;flex-direction:column;gap:16px">
+                <div style="text-align:center;color:var(--muted);padding:30px">読み込み中...</div>
+              </div>
+            </article>
+          </section>
+        </section>
+
+        <!-- ══════ 自律運用: ダッシュボード（アカウント選択後） ══════ -->
+        <section id="autoDashScreen" class="screen">
+          <section class="screen-stack">
+
+            <!-- 選択中アカウント表示 -->
+            <article class="panel" id="autoDashHeader">
+              <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px">
+                <div>
+                  <p class="eyebrow">自律運用ダッシュボード</p>
+                  <h3 id="autoDashAccountName">—</h3>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center">
+                  <span id="autoDashModeBadge"></span>
+                  <button class="ghost-button" style="font-size:12px" onclick="switchScreenAndScroll('autoSelectScreen')">← アカウント選択に戻る</button>
+                </div>
+              </div>
+
+              <!-- 予算メーター -->
+              <div id="autoBudgetMeter" style="margin-top:14px;padding:12px;background:var(--bg-2);border-radius:8px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+                  <span style="font-size:12px;font-weight:600">AI予算（全体）</span>
+                  <span id="autoBudgetLabel" style="font-size:12px;color:var(--muted)">— / —</span>
+                </div>
+                <div style="height:8px;background:var(--bg-3,#2a2a2a);border-radius:4px;overflow:hidden">
+                  <div id="autoBudgetBar" style="height:100%;width:0%;background:var(--green);border-radius:4px;transition:width 0.3s"></div>
+                </div>
+                <div style="display:flex;justify-content:space-between;margin-top:4px">
+                  <span id="autoBudgetAction" style="font-size:10px;color:var(--muted)"></span>
+                  <span id="autoBudgetEstimate" style="font-size:10px;color:var(--muted)"></span>
+                </div>
+              </div>
+
+              <!-- ステータスカード -->
+              <div class="card-grid" style="grid-template-columns:repeat(3,1fr);margin-top:12px">
+                <article class="metric-card">
+                  <p>投稿目標</p>
+                  <strong id="autoDashPostTarget">—</strong>
+                </article>
+                <article class="metric-card">
+                  <p>今日のAI呼び出し</p>
+                  <strong id="autoBudgetCount">—</strong>
+                </article>
+                <article class="metric-card">
+                  <p>最新アクション</p>
+                  <strong id="autoLastAction" style="font-size:12px">—</strong>
+                </article>
+              </div>
+            </article>
+
+            <!-- このアカウントの投稿ミックス -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">このアカウントの方針</p>
+                  <h3>投稿ミックス</h3>
+                </div>
+              </div>
+              <div id="autoDashMix" style="padding:8px 0"></div>
+            </article>
+
+            <!-- 投稿スケジュール設定 -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">このアカウントの制御</p>
+                  <h3>投稿スケジュール</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                AIが自律投稿するタイミングの制御です。手動・予約・キュー投稿も含めて日次目標内に収めます。
+              </p>
+              <form id="autoScheduleForm" class="form-grid" onsubmit="return saveAutoSchedule(event)">
+                <label>1日の投稿目標数<small>手動・キュー投稿を含めた合計</small><input name="auto_daily_posts" type="number" min="1" max="20" placeholder="3" /></label>
+                <label>投稿開始時刻<input name="auto_posting_start" type="time" /></label>
+                <label>投稿終了時刻<input name="auto_posting_end" type="time" /></label>
+                <label>最低投稿間隔（分）<small>連続投稿防止</small><input name="auto_min_interval_minutes" type="number" min="10" max="480" placeholder="60" /></label>
+                <div class="wide form-actions"><button type="submit" class="primary-button">保存</button></div>
+              </form>
+            </article>
+
+            <!-- v8: バズ投稿ストック設定（threads-auto-af 由来） -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">このアカウントの制御</p>
+                  <h3>🔥 バズ投稿ストック</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                改善ループ（10分間隔）が走るタイミングで、閾値を超えたビュー数の posted 投稿を「ストック」に自動昇格します。
+                ストック昇格した投稿は、キューの <code>recycle: "stock_only"</code> 設定で再利用対象に入ります。
+                閾値を <strong>0</strong> にするとこの機能は無効になります。
+              </p>
+              <form id="buzzStockForm" class="form-grid" onsubmit="return saveBuzzStockSettings(event)">
+                <label>🔥 バズ判定：インプ以上
+                  <small>例: 10000 → 1万views 以上の posted をストックに昇格</small>
+                  <input name="buzz_threshold_views" type="number" min="0" max="10000000" step="100" placeholder="0" />
+                </label>
+                <label>
+                  <div style="display:flex;align-items:center;gap:6px;cursor:pointer">
+                    <input type="checkbox" name="stock_recycle_enabled" value="1" />
+                    自動リサイクルを有効にする
+                  </div>
+                  <small>（既存キューで <code>recycle: "stock_only"</code> を選んだ時に対象になります）</small>
+                </label>
+                <label>リサイクル間隔（日）
+                  <small>同じストック投稿を再利用するまでのクールダウン</small>
+                  <input name="stock_recycle_cooldown_days" type="number" min="1" max="365" placeholder="30" />
+                </label>
+                <div class="wide form-actions">
+                  <button type="submit" class="primary-button">保存</button>
+                  <button type="button" class="ghost-button" onclick="openStockPostsModal()">📋 ストック投稿を開く</button>
+                </div>
+              </form>
+            </article>
+
+            <!-- 競合エンゲージメント設定 -->
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">このアカウントの制御</p>
+                  <h3>競合エンゲージメント</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                競合アカウントの投稿に自動で絡みに行きます。ブラウザ操作を使うため、設定画面で<strong>Threadsブラウザログイン</strong>が必要です。<br>
+                ※やりすぎるとBANリスクがあります。1日の上限を低めに設定してください。
+              </p>
+              <form id="autoEngageForm" class="form-grid" onsubmit="return saveAutoEngage(event)">
+                <label class="wide">
+                  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-bottom:8px">
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                      <input type="checkbox" name="engage_comment_enabled" value="1" /> コメント
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                      <input type="checkbox" name="engage_like_enabled" value="1" /> いいね
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                      <input type="checkbox" name="engage_quote_enabled" value="1" /> 引用リポスト
+                    </label>
+                    <label style="display:flex;align-items:center;gap:4px;cursor:pointer">
+                      <input type="checkbox" name="engage_like_replies_enabled" value="1" /> リプ欄いいね
+                      <small style="color:var(--muted)">（見込みフォロワー獲得）</small>
+                    </label>
+                  </div>
+                </label>
+                <label>1日の上限回数<small>全アクション合計</small><input name="engage_daily_limit" type="number" min="1" max="30" placeholder="5" /></label>
+                <label class="wide">競合アカウント<small>カンマ区切り（例: @user1, @user2）。空欄ならリサーチ結果から自動取得</small>
+                  <input name="engage_competitors" type="text" placeholder="@competitor1, @competitor2" />
+                </label>
+                <div class="wide form-actions"><button type="submit" class="primary-button">保存</button></div>
+              </form>
+            </article>
+
+            <!-- このアカウントのディレクティブ -->
+            <article class="panel" id="directivesPanel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">このアカウントへの指示</p>
+                  <h3>ディレクティブ</h3>
+                </div>
+                <button class="primary-button" onclick="showDirectiveForm()">+ 指示を追加</button>
+              </div>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">
+                AIへの追加指示です。キャンペーン・トーン変更・告知など。次回の投稿生成時に反映されます。
+              </p>
+              <div id="directiveFormWrap" style="display:none;margin-bottom:16px;padding:12px;background:var(--bg-2);border-radius:8px">
+                <form id="directiveForm" class="form-grid" onsubmit="return saveDirective(event)">
+                  <input type="hidden" name="id" value="0" />
+                  <input type="hidden" name="account_id" id="directiveAccountId" value="0" />
+                  <label>タイプ
+                    <select name="directive_type">
+                      <option value="instruction">常時指示（トーン・方向性）</option>
+                      <option value="campaign">キャンペーン（期間限定CTA）</option>
+                      <option value="launch">ローンチ告知</option>
+                    </select>
+                  </label>
+                  <label class="wide">タイトル<input name="title" placeholder="例: ニュースレター登録推進" /></label>
+                  <label class="wide">内容<textarea name="content" rows="3" placeholder="AIへの指示内容を自由に記述..."></textarea></label>
+                  <label>CTA URL<small>キャンペーン時のリンク先URL</small><input name="cta_url" placeholder="https://..." /></label>
+                  <label>CTAアクション
+                    <select name="cta_action">
+                      <option value="">なし</option>
+                      <option value="link_click">リンククリック</option>
+                      <option value="follow">フォロー</option>
+                      <option value="dm">DM</option>
+                      <option value="comment">コメント</option>
+                      <option value="like">いいね</option>
+                      <option value="repost">リポスト</option>
+                      <option value="save">保存</option>
+                    </select>
+                  </label>
+                  <label>開始日<small>空欄=即時有効</small><input name="start_date" type="date" /></label>
+                  <label>終了日<small>空欄=手動で無効化するまで</small><input name="end_date" type="date" /></label>
+                  <div class="wide form-actions">
+                    <button type="submit" class="primary-button">保存</button>
+                    <button type="button" class="ghost-button" onclick="hideDirectiveForm()">キャンセル</button>
+                  </div>
+                </form>
+              </div>
+              <div class="table-wrap" style="max-height:300px;overflow-y:auto">
+                <table id="directivesTable"><thead><tr>
+                  <th>タイプ</th><th>タイトル</th><th>内容</th><th>期間</th><th>状態</th><th>操作</th>
+                </tr></thead><tbody></tbody></table>
+              </div>
+            </article>
+
+            <!-- このアカウントのアクティビティ -->
+            <!-- このアカウントのPDCA履歴（コンパクト） -->
+            <article class="panel" id="pdcaPanel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">PDCA（毎日自動実行）</p>
+                  <h3>AI分析履歴</h3>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <button class="ghost-button" style="font-size:11px;padding:3px 10px" onclick="openPdcaModal()">すべて表示</button>
+                  <button class="ghost-button" style="font-size:11px;padding:3px 10px" onclick="runPdcaManual()" title="通常は自動で実行されます。今すぐ手動で実行したい場合のみ使用">手動実行</button>
+                </div>
+              </div>
+              <div id="pdcaCompactList" style="max-height:200px;overflow-y:auto"></div>
+            </article>
+
+          </section>
+        </section>
+
+        <!-- ══════ 自律運用: AIモニター ══════ -->
+        <section id="autoMonitorScreen" class="screen">
+          <section class="screen-stack">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">自律運用</p>
+                  <h3>AIモニター</h3>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                  <select id="monitorAccountFilter" onchange="renderMonitorFeed()" style="font-size:12px;padding:4px 8px">
+                    <option value="0">すべてのアカウント</option>
+                  </select>
+                  <select id="monitorCategoryFilter" onchange="renderMonitorFeed()" style="font-size:12px;padding:4px 8px">
+                    <option value="">すべて</option>
+                    <option value="thinking">AI思考</option>
+                    <option value="post">投稿</option>
+                    <option value="pdca">PDCA</option>
+                    <option value="research">リサーチ</option>
+                    <option value="budget">予算</option>
+                    <option value="error">エラー</option>
+                  </select>
+                  <button id="monitorPauseBtn" class="ghost-button" style="font-size:11px;padding:3px 10px" onclick="toggleMonitorPause()">⏸ 一時停止</button>
+                  <button class="ghost-button" style="font-size:11px;padding:3px 10px;color:var(--red)" onclick="clearAutoEventsFromMonitor()">履歴クリア</button>
+                </div>
+              </div>
+              <div style="padding:0 4px 8px;font-size:11px;color:var(--muted);display:flex;justify-content:space-between">
+                <span id="monitorStatus">5秒ごとに自動更新中</span>
+                <span id="monitorEventCount"></span>
+              </div>
+              <div id="monitorFeedList" style="height:calc(100vh - 230px);overflow-y:auto;border-top:1px solid var(--bg-3,#2a2a2a);font-size:13px"></div>
+            </article>
+          </section>
+        </section>
+
+        <!-- ══════ 自律運用: 日次レポート ══════ -->
+        <section id="autoReportScreen" class="screen">
+          <section class="screen-stack">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">自律運用</p>
+                  <h3>AI日次レポート</h3>
+                </div>
+                <div style="display:flex;gap:6px;align-items:center">
+                  <select id="reportAccountFilter" style="font-size:12px;padding:4px 8px">
+                    <option value="0">アカウントを選択</option>
+                  </select>
+                  <input id="reportDatePicker" type="date" style="font-size:12px;padding:4px 8px" />
+                  <button class="primary-button" style="font-size:12px;padding:4px 12px" onclick="loadDailyReport()">表示</button>
+                </div>
+              </div>
+              <div id="reportContent" style="min-height:200px">
+                <div style="text-align:center;padding:60px;color:var(--muted)">
+                  <p style="font-size:14px">アカウントと日付を選択してレポートを表示</p>
+                </div>
+              </div>
+            </article>
+          </section>
+        </section>
+
+        <!-- ══════ アクティビティ全件モーダル ══════ -->
+        <div id="autoFeedModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closeAutoFeedModal()">
+          <div class="modal-box" style="max-width:900px;width:95vw">
+            <div class="modal-header">
+              <div>
+                <p class="eyebrow">AIの行動ログ</p>
+                <h3>アクティビティ全件</h3>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <select id="feedModalCategoryFilter" onchange="renderFeedModal()" style="font-size:12px;padding:4px 8px">
+                  <option value="">すべて</option>
+                  <option value="thinking">AI思考</option>
+                  <option value="post">投稿</option>
+                  <option value="pdca">PDCA</option>
+                  <option value="research">リサーチ</option>
+                  <option value="budget">予算</option>
+                  <option value="error">エラー</option>
+                </select>
+                <button class="ghost-button" style="font-size:11px;color:var(--red)" onclick="clearAutoEventsFromModal()">履歴クリア</button>
+                <button class="modal-close" onclick="closeAutoFeedModal()">✕</button>
+              </div>
+            </div>
+            <div id="feedModalList" style="padding:0 24px 24px;max-height:70vh;overflow-y:auto"></div>
+          </div>
+        </div>
+
+        <!-- ══════ PDCA全件モーダル ══════ -->
+        <div id="pdcaModal" class="modal-overlay" style="display:none" onclick="if(event.target===this)closePdcaModal()">
+          <div class="modal-box" style="max-width:900px;width:95vw">
+            <div class="modal-header">
+              <div>
+                <p class="eyebrow">PDCA</p>
+                <h3>AI分析履歴</h3>
+              </div>
+              <div style="display:flex;gap:8px;align-items:center">
+                <button class="ghost-button" style="font-size:11px;color:var(--red)" onclick="clearPdcaFromModal()">履歴クリア</button>
+                <button class="modal-close" onclick="closePdcaModal()">✕</button>
+              </div>
+            </div>
+            <div id="pdcaFullList" style="padding:0 24px 24px;max-height:70vh;overflow-y:auto">
+              <div style="text-align:center;padding:40px;color:var(--muted)">読み込み中...</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- PDCA詳細は全件モーダル内で行展開表示 -->
+
+        <!-- ══════ 自律運用: 共通設定 ══════ -->
+        <section id="autoConfigScreen" class="screen">
+          <section class="screen-stack">
+            <article class="panel">
+              <div class="panel-header">
+                <div>
+                  <p class="eyebrow">自律運用</p>
+                  <h3>共通設定</h3>
+                </div>
+              </div>
+              <p class="muted" style="font-size:14px;margin-bottom:16px">
+                すべてのアカウントに共通する自律運用の設定です。<br>
+                通常はデフォルト値のままで問題ありません。
+              </p>
+              <form id="autoSettingsForm" class="form-grid">
+                <label>AI呼び出し日次予算<small>全アカウント合算で1日あたりのAI呼び出し上限回数</small><input name="daily_ai_call_budget" type="number" min="1" placeholder="100" /></label>
+                <label>予算超過時の動作<small>上限に達したときの挙動</small>
+                  <select name="ai_budget_action"><option value="warn">警告のみ</option><option value="pause">自動停止</option></select>
+                </label>
+                <hr class="wide" style="border:none;border-top:1px solid var(--bg-3,#333);margin:8px 0">
+                <label>メトリクス自動更新間隔（時間）<small>フォロワー数・投稿インサイトを自動取得する間隔</small><input name="metrics_auto_refresh_interval_hours" type="number" min="1" placeholder="1" /></label>
+                <label>自動リサーチ実行間隔（日）<small>競合リサーチを自動で再実行する間隔</small><input name="auto_research_interval_days" type="number" min="1" placeholder="7" /></label>
+                <label>投稿リトライ上限<small>投稿がAPIエラーで失敗したときの自動リトライ回数</small><input name="auto_post_retry_max" type="number" min="0" placeholder="3" /></label>
+                <label>改善ループ実行間隔（時間）<small>ナレッジカードのスコア自動更新の頻度</small><input name="improvement_interval_hours" type="number" min="1" placeholder="24" /></label>
+                <label>PDCA分析<small>毎日自動でAIが投稿パフォーマンスを分析し、投稿ミックスを調整</small>
+                  <select name="pdca_enabled"><option value="true">ON</option><option value="false">OFF</option></select>
+                </label>
+                <label>PDCA分析対象日数<small>何日前の投稿までAI分析の対象にするか</small><input name="pdca_analysis_lookback_days" type="number" min="1" placeholder="1" /></label>
+                <label>自動プランナー間隔（秒）<small>投稿計画ループの内部ポーリング間隔</small><input name="auto_planner_interval_seconds" type="number" min="10" placeholder="300" /></label>
+                <label>改善ループ内部間隔（秒）<small>改善ループの内部ポーリング間隔</small><input name="improvement_loop_interval_seconds" type="number" min="10" placeholder="600" /></label>
+                <label>返信リトライ上限<small>返信送信が失敗したときの自動リトライ回数</small><input name="reply_max_attempts" type="number" min="0" placeholder="3" /></label>
+                <label>改善分析に必要な最小投稿数<small>投稿数がこの値未満だとスコア更新はスキップ</small><input name="improvement_min_posts" type="number" min="1" placeholder="3" /></label>
+                <label>改善分析の対象日数<small>直近何日分の投稿データをスコア計算に使うか</small><input name="improvement_analysis_days" type="number" min="1" placeholder="30" /></label>
+                <div class="wide form-actions"><button type="submit" class="primary-button">設定を保存</button></div>
+              </form>
+            </article>
+          </section>
+        </section>
+
+        <!-- オンボーディングウィザード（モーダル・全画面共通） -->
+        <div id="autoOnboardingModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+          <section class="modal-card" style="max-width:640px;width:95vw">
+            <div class="modal-header">
+              <div>
+                <p class="eyebrow">自律運用セットアップ</p>
+                <h3 id="onboardingTitle">自律運用を開始する</h3>
+              </div>
+              <button type="button" class="ghost-button" onclick="closeOnboarding()">閉じる</button>
+            </div>
+            <div id="onboardingSteps" style="display:flex;gap:4px;margin-bottom:16px">
+              <div class="onb-step-dot active" data-step="1">1</div>
+              <div class="onb-step-dot" data-step="2">2</div>
+              <div class="onb-step-dot" data-step="3">3</div>
+              <div class="onb-step-dot" data-step="4">4</div>
+            </div>
+            <div class="onb-page" id="onbStep1">
+              <h4 style="margin-bottom:8px">前提条件チェック</h4>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">自律運用に必要な設定が揃っているか自動検証します。</p>
+              <div id="onbChecklist" style="display:flex;flex-direction:column;gap:8px">
+                <div style="text-align:center;color:var(--muted);padding:20px">検証中...</div>
+              </div>
+              <div id="onbCheckWarning" style="display:none;margin-top:12px;padding:8px;background:#ef444422;border-radius:6px;font-size:12px;color:#ef4444">
+                未達の項目があります。修正してから続行してください。
+              </div>
+            </div>
+            <div class="onb-page" id="onbStep2" style="display:none">
+              <h4 style="margin-bottom:8px">投稿ミックスの設定</h4>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">AIが自動投稿する際の目的比率を設定します（合計100%）。</p>
+              <div id="onbMixSliders" style="display:flex;flex-direction:column;gap:10px"></div>
+              <div style="margin-top:8px;text-align:right">
+                <span style="font-size:12px">合計: <strong id="onbMixTotal">100</strong>%</span>
+              </div>
+              <hr style="border:none;border-top:1px solid var(--bg-3,#333);margin:16px 0">
+              <h4 style="margin-bottom:8px">初回ディレクティブ（省略可）</h4>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">AIへの追加指示。後からダッシュボードで変更・追加できます。</p>
+              <div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">
+                <button type="button" class="ghost-button onb-preset" onclick="applyOnbPreset('growth')" style="font-size:11px">フォロワー増加重視</button>
+                <button type="button" class="ghost-button onb-preset" onclick="applyOnbPreset('engagement')" style="font-size:11px">エンゲージメント重視</button>
+                <button type="button" class="ghost-button onb-preset" onclick="applyOnbPreset('brand')" style="font-size:11px">ブランド認知</button>
+                <button type="button" class="ghost-button onb-preset" onclick="applyOnbPreset('none')" style="font-size:11px">指示なし</button>
+              </div>
+              <textarea id="onbDirectiveText" rows="3" placeholder="例: フォロワー1000人を目指し、毎投稿に質問を含めてエンゲージメントを上げてください。" style="width:100%;font-size:13px;padding:8px;border-radius:6px;border:1px solid var(--bg-3,#333);background:var(--bg-2);color:var(--text);resize:vertical"></textarea>
+            </div>
+            <div class="onb-page" id="onbStep3" style="display:none">
+              <h4 style="margin-bottom:8px">投稿スケジュール設定</h4>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">AIが自律的に投稿するタイミングと量の制御です。キューや予約投稿がある場合はそれも考慮して判断します。</p>
+              <div style="display:flex;flex-direction:column;gap:12px">
+                <label style="display:flex;flex-direction:column;gap:4px">
+                  <span style="font-size:13px;font-weight:600">1日の投稿目標数</span>
+                  <span style="font-size:11px;color:var(--muted)">手動・予約・キュー投稿も含めた合計で判断します</span>
+                  <input id="onbDailyPosts" type="number" min="1" max="20" value="3" style="width:100px;padding:6px 10px;border-radius:6px;border:1px solid var(--bg-3,#333);background:var(--bg-2);color:var(--text);font-size:14px" />
+                </label>
+                <div style="display:flex;gap:12px;flex-wrap:wrap">
+                  <label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px">
+                    <span style="font-size:13px;font-weight:600">投稿開始時刻</span>
+                    <input id="onbPostingStart" type="time" value="09:00" style="padding:6px 10px;border-radius:6px;border:1px solid var(--bg-3,#333);background:var(--bg-2);color:var(--text);font-size:14px" />
+                  </label>
+                  <label style="display:flex;flex-direction:column;gap:4px;flex:1;min-width:120px">
+                    <span style="font-size:13px;font-weight:600">投稿終了時刻</span>
+                    <input id="onbPostingEnd" type="time" value="21:00" style="padding:6px 10px;border-radius:6px;border:1px solid var(--bg-3,#333);background:var(--bg-2);color:var(--text);font-size:14px" />
+                  </label>
+                </div>
+                <label style="display:flex;flex-direction:column;gap:4px">
+                  <span style="font-size:13px;font-weight:600">最低投稿間隔（分）</span>
+                  <span style="font-size:11px;color:var(--muted)">連続投稿を防ぐため、前回投稿からこの時間は空けます</span>
+                  <input id="onbMinInterval" type="number" min="10" max="480" value="60" style="width:100px;padding:6px 10px;border-radius:6px;border:1px solid var(--bg-3,#333);background:var(--bg-2);color:var(--text);font-size:14px" />
+                </label>
+              </div>
+            </div>
+            <div class="onb-page" id="onbStep4" style="display:none">
+              <h4 style="margin-bottom:8px">設定確認</h4>
+              <p class="muted" style="font-size:12px;margin-bottom:12px">以下の内容で自律運用を開始します。</p>
+              <div id="onbSummary" style="display:flex;flex-direction:column;gap:8px;font-size:13px"></div>
+              <div style="margin-top:16px;padding:10px;background:var(--bg-2);border-radius:6px;font-size:12px;color:var(--muted)">
+                <strong style="color:var(--text)">手動操作は引き続き使えます</strong><br>
+                予約投稿・返信管理・ディレクティブ変更など、すべての手動機能はそのまま使えます。
+              </div>
+            </div>
+            <div id="onbModalError" style="display:none;margin-top:12px;padding:10px;background:#ef444422;border-radius:6px;font-size:13px;color:#ef4444"></div>
+            <div style="display:flex;justify-content:space-between;margin-top:16px;padding-top:12px;border-top:1px solid var(--bg-3,#333)">
+              <button type="button" id="onbPrevBtn" class="ghost-button" onclick="onbPrev()" style="display:none">← 戻る</button>
+              <div style="flex:1"></div>
+              <button type="button" id="onbNextBtn" class="primary-button" onclick="onbNext()">次へ →</button>
+            </div>
+          </section>
+        </div>
+
+        <div id="authModal" class="modal-backdrop hidden" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+          <section class="modal-card">
+            <div class="modal-header">
+              <div>
+                <p class="eyebrow">認証アラート</p>
+                <h3 id="authModalTitle">認証状態を確認してください</h3>
+              </div>
+              <button type="button" id="closeAuthModalButton" class="ghost-button">閉じる</button>
+            </div>
+            <div id="authModalSummary" class="summary-strip compact"></div>
+            <div id="authModalBody" class="auth-issue-list"></div>
+          </section>
+        </div>
+
+        <div id="messageBar" class="message-bar hidden">
+          <span class="message-bar-text" id="messageBarText"></span>
+          <button class="message-bar-close" onclick="hideMessage()">閉じる</button>
+        </div>
+        <div id="loadingBar" class="loading-bar hidden">
+          <div class="loading-spinner"></div>
+          <span id="loadingBarText">処理中...</span>
+        </div>
+      </main>
+    </div>
+    <script src="/js/core.js"></script>
+    <script src="/js/accounts-auth.js"></script>
+    <script src="/js/dashboard.js"></script>
+    <script src="/js/research.js"></script>
+    <script src="/js/knowledge.js"></script>
+    <script src="/js/publishing.js"></script>
+    <script src="/js/settings.js"></script>
+    <script src="/js/auto.js"></script>
+    <script src="/js/scenarios.js"></script>
+    <script src="/js/knowledge_uploads.js"></script>
+    <script src="/js/setup_wizard.js"></script>
+  </body>
+</html>
