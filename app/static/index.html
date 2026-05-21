@@ -373,83 +373,76 @@
 
             <div class="roadmap">
 
-              <!-- STEP 1: Meta設定 -->
+              <!-- STEP 1: ライセンスキー購入 -->
               <details class="rm-step">
-                <summary>ステップ1: Meta for DevelopersでThreads APIアプリを作る <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <summary>ステップ1: ライセンスキーを購入する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
                 <div class="rm-body">
-                  <p>Threads APIを使うには、まずMeta側でアプリを作成してAPIキーを取得する必要があります。</p>
+                  <p>Threadoを利用するには、まずライセンスキーを購入する必要があります。</p>
 
                   <h4>やること</h4>
                   <ul>
-                    <li><a href="https://developers.facebook.com/" target="_blank" rel="noreferrer" class="rm-link-btn">https://developers.facebook.com/</a> を開いてログインする</li>
-                    <li>「マイアプリ」→「アプリを作成」を押す</li>
-                    <li>アプリの種類で <strong>「その他」</strong>→<strong>「ビジネス」</strong> を選択</li>
-                    <li>アプリ名を入力して作成する</li>
-                    <li>左メニューの「製品を追加」で <strong>「Threads API」</strong> の「設定」を押す</li>
-                    <li><strong>「Threads App ID」</strong> と <strong>「Threads App Secret」</strong> をコピーする<br>
-                      <span class="muted" style="font-size:12px">※通常の「App ID / App Secret」ではなく Threads API 専用の値を使う</span></li>
+                    <li>購入元（販売代理店または公式チャネル）でライセンスキーを購入する</li>
+                    <li>購入後、<code>XXXX-XXXX-XXXX-XXXX</code> 形式のライセンスキーがメールで届きます</li>
+                    <li>キーは大切に保管してください（再発行は購入元へお問い合わせください）</li>
                   </ul>
 
-                  <h4>コールバックURLを3本登録する</h4>
-                  <ul>
-                    <li><strong>Redirect Callback URL</strong>: <code>https://あなたのドメイン/callback</code></li>
-                    <li><strong>Deauthorize Callback URL</strong>: <code>https://あなたのドメイン/api/meta/deauthorize</code></li>
-                    <li><strong>Data Deletion Request URL</strong>: <code>https://あなたのドメイン/api/meta/data-deletion</code></li>
-                  </ul>
-                  <div class="rm-warn">localhost はNG。HTTPS必須。ローカルで動かす場合は GAS ブリッジか ngrok で HTTPS 化が必要です。</div>
-
-                  <h4>以下のスコープが有効になっていることを確認する</h4>
-                  <ul>
-                    <li><code>threads_basic</code></li>
-                    <li><code>threads_content_publish</code></li>
-                    <li><code>threads_manage_insights</code></li>
-                    <li><code>threads_manage_replies</code></li>
-                    <li><code>threads_read_replies</code></li>
-                  </ul>
+                  <div class="rm-tip">サブスク版は月額¥9,800（税込・1年契約）、ショット版は買い切り（価格は購入元にお問い合わせください）。</div>
                 </div>
               </details>
 
-              <!-- STEP 2: アプリ初期設定 -->
+              <!-- STEP 2: URLアクセス + ライセンス入力 -->
               <details class="rm-step">
-                <summary>ステップ2: このアプリの初期設定をする <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <summary>ステップ2: URLにアクセスしてライセンスキーを入力する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
                 <div class="rm-body">
-                  <p>デスクトップの <strong>「Threado」アイコン</strong> をダブルクリックしてアプリを起動してください。</p>
-                  <p>左メニューの <strong>「設定」</strong> を開いて以下を確認・保存します。</p>
+                  <p>購入完了後、ご案内されたURLをブラウザで開きます。</p>
+
+                  <h4>やること</h4>
                   <ul>
-                    <li><strong>スケジューラ</strong>: <strong>ON</strong> にする</li>
-                    <li><strong>セーフモード</strong>: <strong>ON</strong> にする（最初は必ず ON で始める）</li>
-                    <li><strong>「CLIを検出」</strong> ボタンを押す → <strong>Claude Code</strong> が「利用可」になればOK<br>
-                      <span class="muted" style="font-size:12px">「動作確認」ボタンで PONG が返れば本番運用可能</span></li>
-                    <li><strong>「設定を保存」</strong> を押す</li>
+                    <li>ブラウザでThreadoのURLにアクセスする</li>
+                    <li>ライセンスキー入力画面が自動で表示されます</li>
+                    <li><strong>ライセンスキー</strong>（<code>XXXX-XXXX-XXXX-XXXX</code> 形式）を入力する</li>
+                    <li><strong>「認証する」</strong> ボタンを押す</li>
                   </ul>
+
+                  <div class="rm-tip">入力欄では自動で大文字化＋ハイフン挿入が行われます。コピー＆ペーストでもそのまま入力でもOKです。</div>
                 </div>
               </details>
 
-              <!-- STEP 3: アカウント作成 -->
+              <!-- STEP 3: OAuth認証 -->
               <details class="rm-step">
-                <summary>ステップ3: アカウントを作成してAPI情報を入力する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
+                <summary>ステップ3: 「Threadsと連携する」ボタンを押してOAuth認証する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
                 <div class="rm-body">
-                  <p>左メニューの <strong>「アカウント」</strong> を開きます。</p>
-                  <ul>
-                    <li><strong>表示名 / ユーザー名 / 発信ジャンル / 運用モード</strong> を入力する</li>
-                    <li><strong>Threads App ID / Threads App Secret / Redirect URI</strong> を入力する</li>
-                    <li><strong>優先AI CLI</strong> をアカウントごとに選択できます（Claude Code / Codex CLI）</li>
-                    <li><strong>「アカウントを保存」</strong> を押す</li>
-                  </ul>
-                  <div class="rm-tip">保存後、画面下部の「連携URLガイド」にMeta側に登録すべき3本のURLが表示されます。</div>
-                </div>
-              </details>
+                  <p>ライセンス認証後、アカウント画面で運用するThreadsアカウントと連携します。</p>
 
-              <!-- STEP 4: OAuth認証 -->
-              <details class="rm-step">
-                <summary>ステップ4: OAuth認証でThreadsと接続する <span class="rm-badge rm-badge-required">必須</span> <span class="rm-arrow">▼</span></summary>
-                <div class="rm-body">
-                  <p>アカウント画面の <strong>「OAuth URLを開く」</strong> を押す<br>
-                    → Threads の許可画面で <strong>「許可」</strong> を押す<br>
-                    → 自動でアプリに戻りトークンが保存される</p>
-                  <p>認証成功するとアカウント横のアラートが消えます。</p>
+                  <h4>やること</h4>
+                  <ul>
+                    <li>左メニューの <strong>「アカウント」</strong> を開く</li>
+                    <li>表示名・ユーザー名など基本情報を入力して保存する</li>
+                    <li><strong>「Threadsと連携する」</strong> ボタンを押す</li>
+                    <li>新しいタブで Threads の認証画面が開くので <strong>「許可」</strong> を押す</li>
+                    <li>自動でアプリに戻り、トークンが保存されます</li>
+                  </ul>
+
                   <div class="rm-tip">長期トークンは60日で期限切れしますが、アプリが <strong>7日前に警告を出します</strong>。期限が近づいたらアカウント画面で再認証してください。</div>
-                  <div class="rm-warn" style="font-size:12px">うまく戻らない場合は、URL バーに表示される <code>?code=xxx</code> をコピーして「認証コードを交換」に貼り付けてください。</div>
+                </div>
+              </details>
+
+              <!-- STEP 4: 使うだけ -->
+              <details class="rm-step">
+                <summary>ステップ4: 使うだけ！ <span class="rm-arrow">▼</span></summary>
+                <div class="rm-body">
+                  <p>ここまでで初期設定は完了です。あとはThreadoの各機能を使って投稿・返信・分析を自動化していくだけです。</p>
+
+                  <h4>次にできること</h4>
+                  <ul>
+                    <li><strong>投稿を作成・予約</strong>する（左メニュー「投稿」）</li>
+                    <li><strong>リサーチ</strong>でバズ投稿を分析する（左メニュー「リサーチ」）</li>
+                    <li><strong>自動返信ルール</strong>を設定する（左メニュー「返信」）</li>
+                    <li><strong>シナリオ</strong>で多段ステップ配信を組む（左メニュー「シナリオ」）</li>
+                    <li><strong>ダッシュボード</strong>で全体の運用状況を確認する</li>
+                  </ul>
+
+                  <div class="rm-tip">詳しい使い方は PART 2 以降の手動運用マニュアルを参照してください。</div>
                 </div>
               </details>
 
